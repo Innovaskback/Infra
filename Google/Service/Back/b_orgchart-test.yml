@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-orgchart-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-orgchart-test
+  template:
+    metadata:
+      labels:
+        app: ba-orgchart-test
+    spec:
+      containers:
+        - name: orgchart-test
+          image: zednytawab/orgchart:be-te
+          imagePullPolicy: Always          
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-orgchart-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-orgchart-test
+  ports:
+    - name: orgchart-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

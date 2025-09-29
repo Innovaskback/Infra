@@ -1,0 +1,67 @@
+
+kubectl exec -it -n sql-ha mssql-witness-6c69587b4-4zfq7 -- ss -tunlp
+
+kubectl exec -it -n sql-ha $mssql-witness-86744bd877-ft4hc -- /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P KubeD=0108418585eb4b13b9b369*#@$ -Q "SELECT @@SERVERNAME, @@VERSION"
+
+sqlcmd -S tawab.zedny.com,1433 -U sa -P KubeD=0108418585eb4b13b9b369*#@$ -Q "SELECT @@VERSION"
+
+
+sqlcmd -S tawab.zedny.com,1433 -U sa -P KubeD=0108418585eb4b13b9b369*#@$ -N -C
+
+# التحقق من المنافذ داخل البود
+kubectl exec -it -n sql-ha mssql-witness-6c69587b4-4zfq7 -- netstat -ano | grep -E '1433|5022'
+
+# التحقق من المنافذ في الخدمة
+kubectl get svc mssql-witness-svc -n sql-ha -o yaml | grep -A 5 ports:
+
+# اختبار الاتصال للمنافذ من خارج الكلستر
+nc -zv tawab.zedny.com 1433
+nc -zv tawab.zedny.com 5022
+
+# فحص سجلات انجنكس انجرس
+kubectl logs -n ingress-nginx [اسم-بود-انجرس] | grep -E '1433|5022'
+
+# التحقق من قواعد الشبكة في الكلستر
+kubectl describe networkpolicies -n sql-ha
+
+# إضافة قاعدة NetworkPolicy للسماح بالمنافذ
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sql-ports
+  namespace: sql-ha
+spec:
+  podSelector:
+    matchLabels:
+      app: mssql-witness
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 1433
+    - protocol: TCP
+      port: 5022
+
+# فحص حالة SSL للنطاق
+openssl s_client -connect tawab.zedny.com:1433 -showcerts
+
+# فحص شهادة SSL المستخدمة في السر
+kubectl get secret tls-secret-prod -n sql-ha -o yaml
+
+# إنشاء شهادة SSL ذاتية التوقيع للاختبار
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout tls.key -out tls.crt \
+-subj "/CN=tawab.zedny.com"
+
+# تطبيق الشهادة الجديدة
+kubectl create secret tls tls-test-cert -n sql-ha \
+--key tls.key \
+--cert tls.crt
+
+# تحديث Ingress لاستخدام الشهادة الجديدة
+kubectl patch ingress mssql-witness-ingress -n sql-ha -p \
+'{"spec":{"tls":[{"hosts":["tawab.zedny.com"],"secretName":"tls-test-cert"}]}}'

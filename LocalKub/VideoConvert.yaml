@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videoconvert
+  namespace: production
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: videoconvert
+  template:
+    metadata:
+      labels:
+        app: videoconvert
+    spec:
+      containers:
+        - name: videoconvert-eg
+          image: zednytawab/videoconvert:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: videoconvert
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: videoconvert
+  ports:
+    - name: videoconvert-eg
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

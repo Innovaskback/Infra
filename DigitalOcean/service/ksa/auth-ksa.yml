@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-auth-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fe-auth-ksa
+  template:
+    metadata:
+      labels:
+        app: fe-auth-ksa
+    spec:
+      containers:
+        - name: auth-ksa
+          image: zednytawab/authentication:fe-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-auth-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-auth-ksa
+  ports:
+    - name: auth-ksa
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

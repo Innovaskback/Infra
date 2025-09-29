@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-assessment-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-assessment-prod
+  template:
+    metadata:
+      labels:
+        app: ba-assessment-prod
+    spec:
+      containers:
+        - name: assessment-prod
+          image: zednytawab/assessment:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-assessment-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-assessment-prod
+  ports:
+    - name: assessment-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

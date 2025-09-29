@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-quizzes-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-quizzes-test
+  template:
+    metadata:
+      labels:
+        app: ba-quizzes-test
+    spec:
+      containers:
+        - name: quizzes-test
+          image: zednytawab/quizzes:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-quizzes-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-quizzes-test
+  ports:
+    - name: quizzes-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

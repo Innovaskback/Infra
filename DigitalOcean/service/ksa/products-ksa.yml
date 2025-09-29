@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-ksaucts-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fe-ksaucts-ksa
+  template:
+    metadata:
+      labels:
+        app: fe-ksaucts-ksa
+    spec:
+      containers:
+        - name: products-ksa
+          image: zednytawab/products:fe-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-ksaucts-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-ksaucts-ksa
+  ports:
+    - name: products-ksa
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

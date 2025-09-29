@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-authormode-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-authormode-test
+  template:
+    metadata:
+      labels:
+        app: ba-authormode-test
+    spec:
+      containers:
+        - name: authormode-test
+          image: zednytawab/authormode:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-authormode-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-authormode-test
+  ports:
+    - name: authormode-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

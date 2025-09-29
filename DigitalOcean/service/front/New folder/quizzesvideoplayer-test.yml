@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-quizzesvideoplayer-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-quizzesvideoplayer-test
+  template:
+    metadata:
+      labels:
+        app: fe-quizzesvideoplayer-test
+    spec:
+      containers:
+        - name: quizzesvideoplayer-test
+          image: zednytawab/quizzesvideoplayer:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-quizzesvideoplayer-test
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-quizzesvideoplayer-test
+  ports:
+    - name: quizzesvideoplayer-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

@@ -1,0 +1,220 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: kafka
+spec:
+  serviceName: kafka-headless
+  replicas: 3
+  podManagementPolicy: OrderedReady  # تغيير إلى OrderedReady للتأكد من التسلسل
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - kafka
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: kafka
+        image: confluentinc/cp-kafka:7.4.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9092
+          name: plaintext
+        - containerPort: 9093
+          name: controller
+        command:
+        - sh
+        - -c
+        - |
+          # تحديد Broker ID بناءً على اسم البود
+          export KAFKA_BROKER_ID=${HOSTNAME##*-}
+          echo "Starting Kafka broker ${KAFKA_BROKER_ID}"
+          
+          # انتظار Zookeeper
+          echo "Waiting for Zookeeper..."
+          for i in $(seq 1 30); do
+            if nc -z zookeeper 2181; then
+              echo "Zookeeper is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Zookeeper not ready yet..."
+            sleep 2
+          done
+          
+          # تكوين Kafka
+          cat > /etc/kafka/server.properties << EOF
+          # Essential Settings
+          broker.id=${KAFKA_BROKER_ID}
+          listeners=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+          advertised.listeners=PLAINTEXT://${HOSTNAME}.kafka-headless.kafka.svc.cluster.local:9092
+          listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+          inter.broker.listener.name=PLAINTEXT
+          
+          # Zookeeper
+          zookeeper.connect=zookeeper-0.zookeeper-headless.kafka.svc.cluster.local:2181,zookeeper-1.zookeeper-headless.kafka.svc.cluster.local:2181,zookeeper-2.zookeeper-headless.kafka.svc.cluster.local:2181
+          zookeeper.connection.timeout.ms=30000
+          zookeeper.session.timeout.ms=30000
+          
+          # Logs
+          log.dirs=/var/lib/kafka/data
+          log.retention.hours=168
+          log.segment.bytes=1073741824
+          log.retention.check.interval.ms=300000
+          
+          # Replication - البدء بقيم منخفضة
+          offsets.topic.replication.factor=1
+          transaction.state.log.replication.factor=1
+          transaction.state.log.min.isr=1
+          default.replication.factor=1
+          min.insync.replicas=1
+          
+          # Performance
+          num.network.threads=8
+          num.io.threads=8
+          socket.send.buffer.bytes=102400
+          socket.receive.buffer.bytes=102400
+          socket.request.max.bytes=104857600
+          num.partitions=3
+          num.recovery.threads.per.data.dir=1
+          
+          # Features
+          auto.create.topics.enable=true
+          delete.topic.enable=true
+          group.initial.rebalance.delay.ms=3000
+          
+          # Controller and Replica Settings
+          controller.socket.timeout.ms=30000
+          replica.socket.timeout.ms=30000
+          replica.lag.time.max.ms=30000
+          request.timeout.ms=30000
+          
+          # Leader Election
+          unclean.leader.election.enable=true
+          leader.imbalance.check.interval.seconds=300
+          leader.imbalance.per.broker.percentage=10
+          
+          # Connections
+          max.connections.per.ip=2147483647
+          max.connections=2147483647
+          EOF
+          
+          echo "Configuration created. Starting Kafka..."
+          cat /etc/kafka/server.properties
+          
+          # Start Kafka
+          exec kafka-server-start /etc/kafka/server.properties
+        env:
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx1G -Xms1G"
+        - name: KAFKA_JVM_PERFORMANCE_OPTS
+          value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
+        - name: KAFKA_LOG4J_OPTS
+          value: "-Dlog4j.configuration=file:/etc/kafka/log4j.properties"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka/data
+        - name: kafka-logs
+          mountPath: /var/log/kafka
+        readinessProbe:
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: kafka-logs
+        emptyDir: {}
+      terminationGracePeriodSeconds: 60
+  volumeClaimTemplates:
+  - metadata:
+      name: kafka-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Headless Service للاتصال المباشر بين البودز
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: plaintext
+  - port: 9093
+    targetPort: 9093
+    name: controller
+  clusterIP: None
+  publishNotReadyAddresses: true  # مهم للسماح بالاتصال حتى قبل أن تكون البودز جاهزة
+
+---
+# Service عادي للوصول العام
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: plaintext
+  type: ClusterIP
+
+---
+# ConfigMap للـ log4j (اختياري)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-log4j-config
+  namespace: kafka
+data:
+  log4j.properties: |
+    log4j.rootLogger=INFO, stdout
+    log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+    log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+    log4j.appender.stdout.layout.ConversionPattern=[%d] %p %m (%c)%n
+    log4j.logger.kafka=INFO
+    log4j.logger.org.apache.kafka=INFO

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-products-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-products-prod
+  template:
+    metadata:
+      labels:
+        app: ba-products-prod
+    spec:
+      containers:
+        - name: products-prod
+          image: zednytawab/products:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-products-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-products-prod
+  ports:
+    - name: products-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

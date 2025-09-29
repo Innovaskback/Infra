@@ -1,0 +1,104 @@
+Clone From Git
+
+git clone https://github.com/ZednyBackEnd/dashboard.git C:\Users\Tawab\Desktop\App\Back\dashboard
+git clone https://github.com/ZednyBackEnd/leaderBoard.git C:\Users\Tawab\Desktop\App\Back\leaderBoard
+git clone https://github.com/ZednyBackEnd/quizzes.git C:\Users\Tawab\Desktop\App\Back\quizzes
+git clone https://github.com/ZednyBackEnd/preLogin.git C:\Users\Tawab\Desktop\App\Back\preLogin
+git clone https://github.com/ZednyBackEnd/orgChart.git C:\Users\Tawab\Desktop\App\Back\orgChart
+git clone https://github.com/ZednyBackEnd/authentication.git C:\Users\Tawab\Desktop\App\Back\authentication
+git clone https://github.com/ZednyBackEnd/authorMode.git C:\Users\Tawab\Desktop\App\Back\authorMode
+git clone https://github.com/ZednyBackEnd/pdfreport.git C:\Users\Tawab\Desktop\App\Back\pdfreport
+git clone https://github.com/ZednyBackEnd/assessment.git C:\Users\Tawab\Desktop\App\Back\assessment
+git clone https://github.com/ZednyBackEnd/AllApi.git C:\Users\Tawab\Desktop\App\Back\AllApi
+git clone https://github.com/ZednyBackEnd/infra.git C:\Users\Tawab\Desktop\App\Back\infra
+git clone https://github.com/ZednyBackEnd/products.git C:\Users\Tawab\Desktop\App\Back\products
+git clone https://github.com/ZednyBackEnd/aiassessment.git C:\Users\Tawab\Desktop\App\Back\aiassessment
+git clone https://github.com/ZednyBackEnd/admin.git C:\Users\Tawab\Desktop\App\Back\admin
+git clone https://github.com/ZednyBackEnd/infographic.git C:\Users\Tawab\Desktop\App\Back\infographic
+git clone https://github.com/ZednyBackEnd/mindMap.git C:\Users\Tawab\Desktop\App\Back\mindMap
+git clone https://github.com/ZednyBackEnd/nuget.git C:\Users\Tawab\Desktop\App\Back\nuget
+git clone https://github.com/ZednyBackEnd/videoPlayer.git C:\Users\Tawab\Desktop\App\Back\videoPlayer
+git clone https://github.com/ZednyBackEnd/sharing.git C:\Users\Tawab\Desktop\App\Back\sharing
+git clone https://github.com/ZednyBackEnd/SqlBackup.git C:\Users\Tawab\Desktop\App\Back\SqlBackup
+git clone https://github.com/ZednyBackEnd/VideoTranscoder.git C:\Users\Tawab\Desktop\App\Back\VideoTranscoder
+git clone https://github.com/ZednyFrontEnd/products.git C:\Users\Tawab\Desktop\App\Front\products
+git clone https://github.com/ZednyFrontEnd/prelogin.git C:\Users\Tawab\Desktop\App\Front\prelogin
+git clone https://github.com/ZednyFrontEnd/dashboard.git C:\Users\Tawab\Desktop\App\Front\dashboard
+git clone https://github.com/ZednyFrontEnd/videoplayer.git C:\Users\Tawab\Desktop\App\Front\videoplayer
+git clone https://github.com/ZednyFrontEnd/quizzes.git C:\Users\Tawab\Desktop\App\Front\quizzes
+git clone https://github.com/ZednyFrontEnd/auth.git C:\Users\Tawab\Desktop\App\Front\auth
+git clone https://github.com/ZednyFrontEnd/assessment.git C:\Users\Tawab\Desktop\App\Front\assessment
+git clone https://github.com/ZednyFrontEnd/mindMap.git C:\Users\Tawab\Desktop\App\Front\mindMap
+git clone https://github.com/ZednyFrontEnd/orgchart.git C:\Users\Tawab\Desktop\App\Front\orgchart
+git clone https://github.com/ZednyFrontEnd/authormode.git C:\Users\Tawab\Desktop\App\Front\authormode
+git clone https://github.com/ZednyFrontEnd/infographic.git C:\Users\Tawab\Desktop\App\Front\infographic
+git clone https://github.com/ZednyFrontEnd/leaderBoard.git C:\Users\Tawab\Desktop\App\Front\leaderBoard
+git clone https://github.com/ZednyFrontEnd/oldZedny.git C:\Users\Tawab\Desktop\App\Front\oldZedny
+
+
+
+
+--Mac
+git clone https://github.com/ZednyBackEnd/dashboard.git /Users/tawab/Desktop/App/Back/dashboard
+git clone https://github.com/ZednyBackEnd/leaderBoard.git /Users/tawab/Desktop/App/Back/leaderBoard
+git clone https://github.com/ZednyBackEnd/quizzes.git /Users/tawab/Desktop/App/Back/quizzes
+git clone https://github.com/ZednyBackEnd/preLogin.git /Users/tawab/Desktop/App/Back/preLogin
+git clone https://github.com/ZednyBackEnd/orgChart.git /Users/tawab/Desktop/App/Back/orgChart
+git clone https://github.com/ZednyBackEnd/authentication.git /Users/tawab/Desktop/App/Back/authentication
+git clone https://github.com/ZednyBackEnd/authorMode.git /Users/tawab/Desktop/App/Back/authorMode
+git clone https://github.com/ZednyBackEnd/pdfreport.git /Users/tawab/Desktop/App/Back/pdfreport
+git clone https://github.com/ZednyBackEnd/assessment.git /Users/tawab/Desktop/App/Back/assessment
+git clone https://github.com/ZednyBackEnd/AllApi.git /Users/tawab/Desktop/App/Back/AllApi
+git clone https://github.com/ZednyBackEnd/infra.git /Users/tawab/Desktop/App/Back/infra
+git clone https://github.com/ZednyBackEnd/products.git /Users/tawab/Desktop/App/Back/products
+git clone https://github.com/ZednyBackEnd/aiassessment.git /Users/tawab/Desktop/App/Back/aiassessment
+git clone https://github.com/ZednyBackEnd/admin.git /Users/tawab/Desktop/App/Back/admin
+git clone https://github.com/ZednyBackEnd/infographic.git /Users/tawab/Desktop/App/Back/infographic
+git clone https://github.com/ZednyBackEnd/mindMap.git /Users/tawab/Desktop/App/Back/mindMap
+git clone https://github.com/ZednyBackEnd/nuget.git /Users/tawab/Desktop/App/Back/nuget
+git clone https://github.com/ZednyBackEnd/videoPlayer.git /Users/tawab/Desktop/App/Back/videoPlayer
+git clone https://github.com/ZednyBackEnd/sharing.git /Users/tawab/Desktop/App/Back/sharing
+git clone https://github.com/ZednyFrontEnd/products.git /Users/tawab/Desktop/App/Front/products
+git clone https://github.com/ZednyFrontEnd/prelogin.git /Users/tawab/Desktop/App/Front/prelogin
+git clone https://github.com/ZednyFrontEnd/dashboard.git /Users/tawab/Desktop/App/Front/dashboard
+git clone https://github.com/ZednyFrontEnd/videoplayer.git /Users/tawab/Desktop/App/Front/videoplayer
+git clone https://github.com/ZednyFrontEnd/quizzes.git /Users/tawab/Desktop/App/Front/quizzes
+git clone https://github.com/ZednyFrontEnd/auth.git /Users/tawab/Desktop/App/Front/auth
+git clone https://github.com/ZednyFrontEnd/assessment.git /Users/tawab/Desktop/App/Front/assessment
+git clone https://github.com/ZednyFrontEnd/mindMap.git /Users/tawab/Desktop/App/Front/mindMap
+git clone https://github.com/ZednyFrontEnd/orgchart.git /Users/tawab/Desktop/App/Front/orgchart
+git clone https://github.com/ZednyFrontEnd/authormode.git /Users/tawab/Desktop/App/Front/authormode
+git clone https://github.com/ZednyFrontEnd/infographic.git /Users/tawab/Desktop/App/Front/infographic
+git clone https://github.com/ZednyFrontEnd/leaderBoard.git /Users/tawab/Desktop/App/Front/leaderBoard
+git clone https://github.com/ZednyFrontEnd/oldZedny.git /Users/tawab/Desktop/App/Front/oldZedny
+
+
+
+--npm i
+cd /Users/tawab/Desktop/App/Front/products 
+mpn i
+cd /Users/tawab/Desktop/App/Front/prelogin
+mpn i
+cd /Users/tawab/Desktop/App/Front/dashboard
+mpn i
+cd /Users/tawab/Desktop/App/Front/videoplayer
+mpn i
+cd /Users/tawab/Desktop/App/Front/quizzes
+mpn i
+cd /Users/tawab/Desktop/App/Front/auth
+mpn i
+cd /Users/tawab/Desktop/App/Front/assessment
+mpn i
+cd /Users/tawab/Desktop/App/Front/mindMap
+mpn i
+cd /Users/tawab/Desktop/App/Front/orgchart
+mpn i
+cd /Users/tawab/Desktop/App/Front/authormode
+mpn i
+cd /Users/tawab/Desktop/App/Front/infographic
+mpn i
+cd /Users/tawab/Desktop/App/Front/leaderBoard
+mpn i
+cd /Users/tawab/Desktop/App/Front/oldZedny
+mpn i
+

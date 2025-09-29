@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-infographic-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-infographic-test
+  template:
+    metadata:
+      labels:
+        app: ba-infographic-test
+    spec:
+      containers:
+        - name: infographic-test
+          image: zednytawab/infographic:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-infographic-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-infographic-test
+  ports:
+    - name: infographic-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-authormode-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-authormode-test
+  template:
+    metadata:
+      labels:
+        app: fe-authormode-test
+    spec:
+      containers:
+        - name: authormode-test
+          image: zednytawab/authormode:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-authormode-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-authormode-test
+  ports:
+    - name: authormode-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

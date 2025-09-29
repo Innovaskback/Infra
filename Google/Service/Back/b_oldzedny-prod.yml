@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-oldzedny-prod
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-oldzedny-prod
+  template:
+    metadata:
+      labels:
+        app: ba-oldzedny-prod
+    spec:
+      containers:
+        - name: oldzedny-prod
+          image: zednytawab/oldzedny:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-oldzedny-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-oldzedny-prod
+  ports:
+    - name: oldzedny-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

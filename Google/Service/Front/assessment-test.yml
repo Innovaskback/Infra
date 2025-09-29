@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-assessment-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-assessment-test
+  template:
+    metadata:
+      labels:
+        app: fe-assessment-test
+    spec:
+      containers:
+        - name: assessment-test
+          image: zednytawab/assessment:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-assessment-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-assessment-test
+  ports:
+    - name: assessment-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

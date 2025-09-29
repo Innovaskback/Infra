@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-assessment-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-assessment-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-assessment-ksa
+    spec:
+      containers:
+        - name: assessment-ksa
+          image: zednytawab/assessment:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-assessment-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-assessment-ksa
+  ports:
+    - name: assessment-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

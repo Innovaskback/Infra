@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-directories-simple
+  namespace: kafka
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: mkdir
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Creating directories in /tmp..."
+          mkdir -p /tmp/zookeeper-data-0 /tmp/zookeeper-data-1 /tmp/zookeeper-data-2
+          mkdir -p /tmp/zookeeper-logs-0 /tmp/zookeeper-logs-1 /tmp/zookeeper-logs-2
+          mkdir -p /tmp/kafka-data-0 /tmp/kafka-data-1 /tmp/kafka-data-2
+          chmod 777 /tmp/zookeeper-* /tmp/kafka-*
+          echo "Directories created successfully:"
+          ls -la /tmp/ | grep -E "(zookeeper|kafka)" || echo "No directories found"
+          echo "Job completed successfully"
+        volumeMounts:
+        - name: host-tmp
+          mountPath: /tmp
+      volumes:
+      - name: host-tmp
+        hostPath:
+          path: /tmp
+          type: DirectoryOrCreate

@@ -1,0 +1,89 @@
+# Complete MetalLB Setup for Port-Free Access with Enhanced Configuration
+
+# Step 1: Install MetalLB (run this command first)
+# kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+
+# Step 2: Wait for MetalLB pods to be ready
+# kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb --timeout=90s
+
+# Step 3: Create IP Address Pool for LoadBalancer services
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 64.20.63.3-64.20.63.3  # Your server's external IP address
+  autoAssign: true           # Automatically assign IPs from this pool
+
+---
+# Step 4: Create L2Advertisement to announce the IP addresses
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - default-pool
+  # nodeSelectors: []        # Advertise from all nodes (default)
+
+---
+# Step 5: Enhanced Ingress configuration with better annotations
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-prod-simple
+  namespace: prod
+  annotations:
+    # Disable SSL redirect for HTTP access
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    
+    # Enable CORS if needed for frontend-backend communication
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Connection timeout settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Body size limit for file uploads
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    
+    # Rate limiting (optional - adjust as needed)
+    # nginx.ingress.kubernetes.io/rate-limit: "100"
+    
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:  # No host specified - accepts requests to any IP/domain
+        paths:
+          # Frontend prelogin service - handles root path
+          - backend:
+              service:
+                name: fe-prelogin-prod
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+            
+          # Backend admin service - handles admin routes
+          - backend:
+              service:
+                name: ba-admin-prod
+                port:
+                  number: 8080
+            path: /b_admin
+            pathType: Prefix
+            
+          # Optional: Add API path for cleaner routing
+          - backend:
+              service:
+                name: ba-admin-prod
+                port:
+                  number: 8080
+            path: /api
+            pathType: Prefix

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-pdfreport-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-pdfreport-test
+  template:
+    metadata:
+      labels:
+        app: ba-pdfreport-test
+    spec:
+      containers:
+        - name: pdfreport-test
+          image: zednytawab/pdfreport:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-pdfreport-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-pdfreport-test
+  ports:
+    - name: pdfreport-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

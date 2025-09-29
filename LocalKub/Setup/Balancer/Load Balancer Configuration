@@ -1,0 +1,295 @@
+# Main Load Balancer Configuration
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name 69.10.55.230;
+    
+    # Logging with custom format
+    access_log /var/log/nginx/lb_access.log main;
+    error_log /var/log/nginx/lb_error.log warn;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    
+    # Rate limiting
+    limit_req zone=general burst=20 nodelay;
+    limit_conn addr 50;
+    
+    # Custom error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    
+    location = /404.html {
+        internal;
+        default_type text/html;
+        return 404 '<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>Load Balancer</center>
+</body>
+</html>';
+    }
+    
+    location = /50x.html {
+        internal;
+        default_type text/html;
+        return 500 '<html>
+<head><title>Service Temporarily Unavailable</title></head>
+<body>
+<center><h1>Service Temporarily Unavailable</h1></center>
+<hr><center>Load Balancer - Please try again later</center>
+</body>
+</html>';
+    }
+    
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "Load Balancer Status: OK\n";
+        add_header Content-Type text/plain;
+    }
+    
+    # Nginx status (for monitoring)
+    location /nginx-status {
+        stub_status on;
+        access_log off;
+        allow 127.0.0.1;
+        allow 192.168.0.0/16;
+        allow 10.0.0.0/8;
+        deny all;
+    }
+    
+    # Storage/Media files routing
+    location ~ ^/(uploads|media|static|storage)/ {
+        # Route to storage servers
+        proxy_pass http://storage_servers;
+        
+        # Headers for storage
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Cache settings for static content
+        proxy_cache cache_zone;
+        proxy_cache_valid 200 302 1h;
+        proxy_cache_valid 404 1m;
+        proxy_cache_bypass $http_cache_control;
+        add_header X-Cache-Status $upstream_cache_status;
+        
+        # Extended timeout for large files
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 90s;
+        proxy_read_timeout 90s;
+        
+        # Buffer settings for large files
+        proxy_buffering on;
+        proxy_buffer_size 8k;
+        proxy_buffers 32 8k;
+        proxy_busy_buffers_size 64k;
+        proxy_temp_file_write_size 64k;
+        
+        # Client settings
+        client_body_timeout 60s;
+        client_max_body_size 100M;
+        
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # API routing
+    location /api/ {
+        # Rate limiting for API
+        limit_req zone=api burst=50 nodelay;
+        
+        proxy_pass http://api_servers;
+        
+        # API headers
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        
+        # API specific settings
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        
+        # Timeouts for API
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+        
+        # No caching for API
+        proxy_cache_bypass 1;
+        proxy_no_cache 1;
+        
+        # CORS headers (adjust as needed)
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+        
+        # Handle OPTIONS requests
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+    }
+    
+    # WebSocket support
+    location /ws/ {
+        proxy_pass http://websocket_servers;
+        
+        # WebSocket headers
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket timeouts
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+        
+        # Disable buffering for WebSocket
+        proxy_buffering off;
+    }
+    
+    # Main application routing (default)
+    location / {
+        proxy_pass http://backend_servers;
+        
+        # Essential headers
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Request-ID $request_id;
+        
+        # Handle redirects properly
+        proxy_redirect ~^https?://[^/]+(.*)$ http://$http_host$1;
+        
+        # Connection settings
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 60s;
+        
+        # Buffer settings
+        proxy_buffering on;
+        proxy_buffer_size 8k;
+        proxy_buffers 16 8k;
+        proxy_busy_buffers_size 32k;
+        
+        # Handle upstream failures gracefully
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 10s;
+        
+        # Cache for GET requests (optional)
+        proxy_cache cache_zone;
+        proxy_cache_methods GET HEAD;
+        proxy_cache_valid 200 302 10m;
+        proxy_cache_valid 404 1m;
+        proxy_cache_bypass $http_cache_control $cookie_session;
+        proxy_no_cache $http_cache_control $cookie_session;
+        add_header X-Cache-Status $upstream_cache_status;
+    }
+    
+    # Static files optimization
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|webp|mp4|webm)$ {
+        proxy_pass http://backend_servers;
+        
+        # Headers
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Handle redirects
+        proxy_redirect ~^https?://[^/]+(.*)$ http://$http_host$1;
+        
+        # Aggressive caching for static assets
+        proxy_cache cache_zone;
+        proxy_cache_valid 200 302 7d;
+        proxy_cache_valid 404 1m;
+        add_header X-Cache-Status $upstream_cache_status;
+        
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        
+        # Compression
+        gzip_static on;
+    }
+    
+    # Block common exploit attempts
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    
+    # Block access to backup and source files
+    location ~ \.(bak|config|sql|fla|psd|ini|log|sh|inc|swp|dist)|~ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}
+
+# HTTPS Server (using self-signed certificate)
+server {
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    server_name 69.10.55.230;
+    
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/server.crt;
+    ssl_certificate_key /etc/nginx/ssl/server.key;
+    
+    # SSL Security Settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_session_tickets off;
+    
+    # Enable OCSP stapling (won't work with self-signed)
+    # ssl_stapling on;
+    # ssl_stapling_verify on;
+    
+    # Security headers for HTTPS
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    
+    # Include all location blocks from HTTP server
+    # (Copy all location blocks from above or use include)
+    
+    # For brevity, including main proxy configuration
+    location / {
+        proxy_pass http://backend_servers;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 60s;
+        proxy_next_upstream error timeout http_500 http_502 http_503 http_504;
+    }
+}

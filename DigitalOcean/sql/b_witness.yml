@@ -1,0 +1,190 @@
+# 1. Create ConfigMap for SQL Server configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mssql-witness-config
+  namespace: sql-ha
+data:
+  setup-witness.sql: |
+    CREATE ENDPOINT Mirroring
+    STATE = STARTED
+    AS TCP (
+        LISTENER_PORT = 5022,
+        LISTENER_IP = ALL
+    )
+    FOR DATABASE_MIRRORING (
+        AUTHENTICATION = WINDOWS,
+        ENCRYPTION = REQUIRED ALGORITHM AES,
+        ROLE = WITNESS
+    );
+
+---
+# 2. Create Secret for SQL Server credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mssql-witness-secret
+  namespace: sql-ha
+type: Opaque
+data:
+  SA_PASSWORD: S3ViZUQ9MDEwODQxODU4NWViNGIxM2I5YjM2OSojQCQ=
+
+---
+# 3. Create Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mssql-witness-data
+  namespace: sql-ha
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# 4. Create Deployment with SQL Tools
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mssql-witness
+  namespace: sql-ha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mssql-witness
+  template:
+    metadata:
+      labels:
+        app: mssql-witness
+    spec:
+      securityContext:
+        fsGroup: 10001
+      initContainers:
+      - name: init-tools
+        image: mcr.microsoft.com/mssql-tools
+        command:
+        - sh
+        - -c
+        - |
+          mkdir -p /opt/mssql-tools/bin
+          cp /opt/mssql-tools/bin/sqlcmd /shared/sqlcmd
+          cp /opt/mssql-tools/bin/bcp /shared/bcp
+          chmod +x /shared/sqlcmd
+          chmod +x /shared/bcp
+        volumeMounts:
+        - name: tools
+          mountPath: /shared
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2019-latest
+          ports:
+            - containerPort: 1433
+              hostPort: 1433 # إضافة hostPort للسماح بالاتصال المباشر
+            - containerPort: 5022
+              hostPort: 5022 # إضافة hostPort للسماح بالاتصال المباشر
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mssql-witness-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_AGENT_ENABLED
+              value: "true"
+            - name: MSSQL_PID
+              value: "Developer" # تغيير من Express إلى Developer للحصول على ميزات إضافية
+            - name: MSSQL_TCP_PORT
+              value: "1433"
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: mssql-data
+              mountPath: /var/opt/mssql
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            tcpSocket:
+              port: 1433
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 1433
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - name: mssql-data
+          persistentVolumeClaim:
+            claimName: mssql-witness-data
+        - name: tools
+          emptyDir: {}
+---
+# 5. Create Service as LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql-witness
+  namespace: sql-ha
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout: "30"
+spec:
+  selector:
+    app: mssql-witness
+  ports:
+    - name: tds
+      port: 1433
+      targetPort: 1433
+    - name: mirroring
+      port: 5022
+      targetPort: 5022
+  type: LoadBalancer 
+  #loadBalancerIP: "174.138.103.163"
+  externalTrafficPolicy: Local
+---
+# 6. Create Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mssql-witness-ingress
+  namespace: sql-ha
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "TCP" # تغيير من MSSQL إلى TCP
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - tawab.zedny.com
+      secretName: tls-secret-prod
+  rules:
+    - host: tawab.zedny.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mssql-witness
+                port:
+                  number: 1433
+          - path: /mirror
+            pathType: Prefix
+            backend:
+              service:
+                name: mssql-witness
+                port:
+                  number: 5022

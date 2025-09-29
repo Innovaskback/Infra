@@ -1,0 +1,54 @@
+
+
+
+kubectl delete namespace sql-ha --force
+
+kubectl create namespace sql-ha
+
+kubectl get pods -n sql-ha -w
+
+KubeD=0108418585eb4b13b9b369*#@$
+
+الحصول على IP الخارجي للـ Ingress:
+kubectl get ingress mssql-witness-ingress -n sql-ha
+
+kubectl exec -it mssql-witness-85946f8645-cmjck -n sql-ha -- /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'KubeD=0108418585eb4b13b9b369*#@$'
+
+kubectl run sqltest --image=mcr.microsoft.com/mssql-tools -n sql-ha -i --tty -- /bin/bash
+
+
+
+
+
+
+# الدخول إلى Pod
+
+kubectl logs -f deployment/sql-ha-witness -n sql-ha
+
+kubectl get secret mssql-witness-secret -n sql-ha -o jsonpath='{.data.SA_PASSWORD}' | base64 --decode
+
+kubectl exec -it sql-ha-witness-5dffb6f9fd-jq9pd -n sql-ha -- /opt/sql-ha-tools/bin/sqlcmd -S localhost -U sa -P KubeD=0108418585eb4b13b9b369*#@$
+
+
+
+
+
+
+
+configmap/sql-ha-witness-config created
+secret/sql-ha-witness-secret created
+persistentvolumeclaim/sql-ha-witness-data created
+deployment.apps/sql-ha-witness created
+service/sql-ha-witness-svc created
+ingress.networking.k8s.io/sql-ha-witness-ingress created
+networkpolicy.networking.k8s.io/sql-ha-witness-network-policy created
+
+
+# التحقق من جميع الموارد
+kubectl get all -n sql-ha
+
+# مراقبة حالة Pod
+kubectl get pods -n sql-ha -w
+
+# عرض السجلات
+kubectl logs -f deployment/sql-ha-witness -n sql-ha

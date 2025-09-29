@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-videoplayer-prod
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-videoplayer-prod
+  template:
+    metadata:
+      labels:
+        app: ba-videoplayer-prod
+    spec:
+      containers:
+        - name: videoplayer-prod
+          image: zednytawab/videoplayer:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-videoplayer-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-videoplayer-prod
+  ports:
+    - name: videoplayer-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

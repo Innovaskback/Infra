@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-leaderboard-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-leaderboard-test
+  template:
+    metadata:
+      labels:
+        app: fe-leaderboard-test
+    spec:
+      containers:
+        - name: leaderboard-test
+          image: zednytawab/leaderboard:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-leaderboard-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-leaderboard-test
+  ports:
+    - name: leaderboard-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-sharing-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-sharing-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-sharing-ksa
+    spec:
+      containers:
+        - name: sharing-ksa
+          image: zednytawab/sharing:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-sharing-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-sharing-ksa
+  ports:
+    - name: sharing-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

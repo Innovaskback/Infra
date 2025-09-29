@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-leaderboard-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-leaderboard-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-leaderboard-ksa
+    spec:
+      containers:
+        - name: leaderboard-ksa
+          image: zednytawab/leaderboard:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-leaderboard-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-leaderboard-ksa
+  ports:
+    - name: leaderboard-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

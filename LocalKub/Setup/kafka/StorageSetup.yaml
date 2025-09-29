@@ -1,0 +1,253 @@
+# StorageClass للتخزين المحلي
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+# Job لإنشاء جميع المجلدات المطلوبة
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-all-directories-v2
+  namespace: kafka
+spec:
+  template:
+    spec:
+      hostPID: true
+      containers:
+      - name: directory-creator
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # إنشاء المجلدات للزووكيبر (3 عقد) في مسار دائم
+          for i in 0 1 2; do
+            mkdir -p /host-data/kafka-storage/zookeeper-data-$i
+            mkdir -p /host-data/kafka-storage/zookeeper-logs-$i
+            chmod 777 /host-data/kafka-storage/zookeeper-data-$i
+            chmod 777 /host-data/kafka-storage/zookeeper-logs-$i
+            echo "Created zookeeper directories for node $i"
+          done
+          
+          # إنشاء المجلدات لكافكا (3 عقد)
+          for i in 0 1 2; do
+            mkdir -p /host-data/kafka-storage/kafka-data-$i
+            chmod 777 /host-data/kafka-storage/kafka-data-$i
+            echo "Created kafka directory for node $i"
+          done
+          
+          echo "All directories created successfully!"
+          ls -la /host-data/kafka-storage/ | grep -E "(zookeeper|kafka)"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host-data
+          mountPath: /host-data
+      volumes:
+      - name: host-data
+        hostPath:
+          path: /var/lib
+      restartPolicy: OnFailure
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+
+---
+# PersistentVolumes للزووكيبر - جميع العقد - مسارات محدثة
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-data-pv-0-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-data-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-logs-pv-0-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-logs-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-data-pv-1-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-data-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-logs-pv-1-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-logs-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-data-pv-2-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-data-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-logs-pv-2-new
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/zookeeper-logs-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+# PersistentVolumes لكافكا - جميع العقد - مسارات محدثة
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kafka-data-pv-0-new
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/kafka-data-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kafka-data-pv-1-new
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/kafka-data-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kafka-data-pv-2-new
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /var/lib/kafka-storage/kafka-data-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists

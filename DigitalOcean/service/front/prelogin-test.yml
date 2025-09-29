@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-prelogin-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-prelogin-test
+  template:
+    metadata:
+      labels:
+        app: fe-prelogin-test
+    spec:
+      containers:
+        - name: prelogin-test
+          image: zednytawab/prelogin:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-prelogin-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-prelogin-test
+  ports:
+    - name: prelogin-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

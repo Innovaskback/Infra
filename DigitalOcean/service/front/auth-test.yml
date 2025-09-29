@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-auth-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-auth-test
+  template:
+    metadata:
+      labels:
+        app: fe-auth-test
+    spec:
+      containers:
+        - name: auth-test
+          image: zednytawab/authentication:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-auth-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-auth-test
+  ports:
+    - name: auth-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

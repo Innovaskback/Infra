@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zednyvideoconvert
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zednyvideoconvert
+  template:
+    metadata:
+      labels:
+        app: zednyvideoconvert
+    spec:
+      containers:
+        - name: zednyvideoconvert-eg
+          image: zednytawab/zednyvideoconvert:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zednyvideoconvert
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: zednyvideoconvert
+  ports:
+    - name: zednyvideoconvert-eg
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-mindmap-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-mindmap-test
+  template:
+    metadata:
+      labels:
+        app: fe-mindmap-test
+    spec:
+      containers:
+        - name: mindmap-test
+          image: zednytawab/mindmap:fe-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-mindmap-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-mindmap-test
+  ports:
+    - name: mindmap-test
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

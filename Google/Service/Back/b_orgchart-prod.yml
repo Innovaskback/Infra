@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-orgchart-prod
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-orgchart-prod
+  template:
+    metadata:
+      labels:
+        app: ba-orgchart-prod
+    spec:
+      containers:
+        - name: orgchart-prod
+          image: zednytawab/orgchart:be-pr
+          imagePullPolicy: Always          
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-orgchart-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-orgchart-prod
+  ports:
+    - name: orgchart-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

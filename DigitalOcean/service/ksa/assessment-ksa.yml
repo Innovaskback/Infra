@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-assessment-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fe-assessment-ksa
+  template:
+    metadata:
+      labels:
+        app: fe-assessment-ksa
+    spec:
+      containers:
+        - name: assessment-ksa
+          image: zednytawab/assessment:fe-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-assessment-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-assessment-ksa
+  ports:
+    - name: assessment-ksa
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

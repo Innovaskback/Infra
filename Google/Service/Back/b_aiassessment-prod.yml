@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-aiassessment-prod
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-aiassessment-prod
+  template:
+    metadata:
+      labels:
+        app: ba-aiassessment-prod
+    spec:
+      containers:
+        - name: aiassessment-prod
+          image: zednytawab/aiassessment:be-pr
+          imagePullPolicy: Always          
+          ports:
+            - containerPort: 80
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-aiassessment-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-aiassessment-prod
+  ports:
+    - name: aiassessment-prod
+      protocol: TCP
+      port: 80
+      targetPort: 80

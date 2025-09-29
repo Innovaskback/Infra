@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-dashboard-ksa
+  namespace: production
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: ba-dashboard-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-dashboard-ksa
+    spec:
+      containers:
+        - name: dashboard-ksa
+          image: zednytawab/dashboard:be-ks
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-dashboard-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-dashboard-ksa
+  ports:
+    - name: dashboard-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

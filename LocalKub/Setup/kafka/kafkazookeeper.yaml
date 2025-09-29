@@ -1,0 +1,166 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: kafka
+spec:
+  serviceName: zookeeper-headless
+  replicas: 3
+  podManagementPolicy: Parallel  # إضافة هذا لتشغيل البودز بالتوازي
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:7.4.0
+        ports:
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: server
+        - containerPort: 3888
+          name: leader-election
+        env:
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        - name: ZOOKEEPER_TICK_TIME
+          value: "2000"
+        - name: ZOOKEEPER_INIT_LIMIT
+          value: "10"
+        - name: ZOOKEEPER_SYNC_LIMIT
+          value: "5"
+        - name: ZOOKEEPER_MAX_CLIENT_CNXNS
+          value: "60"
+        - name: ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT
+          value: "3"
+        - name: ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL
+          value: "24"
+        - name: ZOOKEEPER_4LW_COMMANDS_WHITELIST
+          value: "srvr,mntr,conf,ruok"
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx512M -Xms512M"
+        command:
+          - bash
+          - -c
+          - |
+            # استخراج الرقم من اسم البود
+            export ZOOKEEPER_SERVER_ID=$(echo $HOSTNAME | sed 's/.*-//')
+            ((ZOOKEEPER_SERVER_ID++))
+            
+            # إنشاء ملف myid
+            echo $ZOOKEEPER_SERVER_ID > /var/lib/zookeeper/data/myid
+            
+            # إنشاء ملف zoo.cfg
+            cat > /etc/kafka/zoo.cfg << EOF
+            tickTime=2000
+            initLimit=10
+            syncLimit=5
+            dataDir=/var/lib/zookeeper/data
+            dataLogDir=/var/lib/zookeeper/log
+            clientPort=2181
+            maxClientCnxns=60
+            autopurge.snapRetainCount=3
+            autopurge.purgeInterval=24
+            4lw.commands.whitelist=srvr,mntr,conf,ruok
+            server.1=zookeeper-0.zookeeper-headless.kafka.svc.cluster.local:2888:3888
+            server.2=zookeeper-1.zookeeper-headless.kafka.svc.cluster.local:2888:3888
+            server.3=zookeeper-2.zookeeper-headless.kafka.svc.cluster.local:2888:3888
+            EOF
+            
+            echo "Starting Zookeeper with ID: $ZOOKEEPER_SERVER_ID"
+            echo "Config file:"
+            cat /etc/kafka/zoo.cfg
+            echo "myid file:"
+            cat /var/lib/zookeeper/data/myid
+            
+            # تشغيل زووكيبر
+            exec /usr/bin/zookeeper-server-start /etc/kafka/zoo.cfg
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /var/lib/zookeeper/data
+        - name: zookeeper-logs
+          mountPath: /var/lib/zookeeper/log
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              echo ruok | nc localhost 2181 | grep imok
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              echo ruok | nc localhost 2181 | grep imok
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+  volumeClaimTemplates:
+  - metadata:
+      name: zookeeper-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+  - metadata:
+      name: zookeeper-logs
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-headless
+  namespace: kafka
+spec:
+  selector:
+    app: zookeeper
+  ports:
+  - port: 2181
+    targetPort: 2181
+    name: client
+  - port: 2888
+    targetPort: 2888
+    name: server
+  - port: 3888
+    targetPort: 3888
+    name: leader-election
+  clusterIP: None
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: kafka
+spec:
+  selector:
+    app: zookeeper
+  ports:
+  - port: 2181
+    targetPort: 2181
+  type: ClusterIP

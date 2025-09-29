@@ -1,0 +1,166 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  creationTimestamp: "2024-10-11T21:19:55Z"
+  generation: 3
+  name: ingress-prod-wildcard
+  namespace: production
+  resourceVersion: "10282843"
+  uid: 6eb137d4-b84c-4934-b11a-f276dfca430b
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "*.zedny.com"
+      http:
+        paths:
+          - backend:
+              service:
+                name: fe-prelogin-prod
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-auth-prod
+                port:
+                  number: 3000
+            path: /authentication
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-products-prod
+                port:
+                  number: 3000
+            path: /products
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-videoplayer-prod
+                port:
+                  number: 3000
+            path: /videoplayer
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-assessment-prod
+                port:
+                  number: 3000
+            path: /assessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-dashboard-prod
+                port:
+                  number: 3000
+            path: /dashboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-leaderboard-prod
+                port:
+                  number: 3000
+            path: /leaderboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-infographic-prod
+                port:
+                  number: 3000
+            path: /infographic
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-admin-prod
+                port:
+                  number: 8080
+            path: /b_admin
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-aiassessment-prod
+                port:
+                  number: 80
+            path: /b_aiassessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-prelogin-prod
+                port:
+                  number: 8080
+            path: /b_prelogin
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-auth-prod
+                port:
+                  number: 8080
+            path: /b_authentication
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-products-prod
+                port:
+                  number: 8080
+            path: /b_products
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-assessment-prod
+                port:
+                  number: 8080
+            path: /b_assessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-dashboard-prod
+                port:
+                  number: 8080
+            path: /b_dashboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-leaderboard-prod
+                port:
+                  number: 8080
+            path: /b_leaderboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-infographic-prod
+                port:
+                  number: 8080
+            path: /b_infographic
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-sharing-prod
+                port:
+                  number: 8080
+            path: /b_sharing
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-quizzesvideoplayer-prod
+                port:
+                  number: 8080
+            path: /b_quizzesvideoplayer
+            pathType: Prefix
+
+  tls:
+    - hosts:
+        - "*.zedny.com"
+      secretName: zedny-wildcard-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 144.126.246.191

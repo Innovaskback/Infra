@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: watching
+  namespace: production
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: watching
+  template:
+    metadata:
+      labels:
+        app: watching
+    spec:
+      containers:
+        - name: watching-eg
+          image: zednytawab/watching:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: watching
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: watching
+  ports:
+    - name: watching-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

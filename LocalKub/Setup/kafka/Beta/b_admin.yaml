@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-admin-beta
+  namespace: beta
+  labels:
+    app: ba-admin-beta
+    tier: backend
+    environment: beta
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-admin-beta
+  template:
+    metadata:
+      labels:
+        app: ba-admin-beta
+        tier: backend
+        environment: beta
+    spec:
+      containers:
+        - name: admin
+          image: zednytawab/admin:be-pr
+          imagePullPolicy: Always         
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+
+          # Resource limits for backend service
+          resources:
+            requests:
+              memory: "256Mi"         # Backend typically needs more memory
+              cpu: "200m"             # Minimum CPU required (0.2 core)
+            limits:
+              memory: "1Gi"           # Maximum memory allowed
+              cpu: "1000m"            # Maximum CPU allowed (1 core)
+          
+          # Environment variables for backend configuration
+          env:
+            - name: ENVIRONMENT
+              value: "beta"
+            - name: PORT
+              value: "8080"
+            - name: LOG_LEVEL
+              value: "info"
+
+      # Pull secrets for private registry
+      imagePullSecrets:
+        - name: regcred
+      
+      # Restart policy
+      restartPolicy: Always
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+    
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-admin-beta
+  namespace: beta
+  labels:
+    app: ba-admin-beta
+    tier: backend
+    environment: beta
+spec:
+  type: ClusterIP                    # Internal service only
+  selector:
+    app: ba-admin-beta
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080                     # Service port
+      targetPort: 8080               # Container port
+  
+  # Session affinity (useful for stateful backends)
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800          # 3 hours session timeout

@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-prod
+  namespace: production
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-ksa"
+    nginx.ingress.kubernetes.io/from-to-www-redirect: "true"
+
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: zedny.com.sa
+      http:
+        paths:
+          - backend:
+              service:
+                name: fe-prelogin-ksa
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-videoplayer-ksa
+                port:
+                  number: 3000
+            path: /videoplayer
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-auth-ksa
+                port:
+                  number: 8080
+            path: /b_auth
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-watching-ksa
+                port:
+                  number: 8080
+            path: /b_watching
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-videoplayer-ksa
+                port:
+                  number: 8080
+            path: /b_videoplayer
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-dashboard-ksa
+                port:
+                  number: 3000
+            path: /dashboard
+            pathType: Prefix
+  tls:
+    - hosts:
+        - zedny.com.sa
+      secretName: tls-secret-ksa

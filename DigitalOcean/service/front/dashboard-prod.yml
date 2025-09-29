@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-dashboard-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-dashboard-prod
+  template:
+    metadata:
+      labels:
+        app: fe-dashboard-prod
+    spec:
+      containers:
+        - name: dashboard-prod
+          image: zednytawab/dashboard:fe-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-dashboard-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-dashboard-prod
+  ports:
+    - name: dashboard-prod
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

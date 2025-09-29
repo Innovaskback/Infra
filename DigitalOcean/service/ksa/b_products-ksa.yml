@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-ksaucts-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-ksaucts-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-ksaucts-ksa
+    spec:
+      containers:
+        - name: products-ksa
+          image: zednytawab/products:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-ksaucts-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-ksaucts-ksa
+  ports:
+    - name: products-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

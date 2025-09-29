@@ -1,0 +1,19 @@
+
+69.10.55.228
+
+KubeD=0108418585*#@$
+
+# 1. Save the Script
+sudo nano setup.sh
+
+# 2. Make It Executable
+sudo chmod +x setup.sh
+
+# 3. Run It
+sudo ./setup.sh
+
+
+
+sudo chown -R tawab:tawab /var/www/hls/videos/
+
+

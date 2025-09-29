@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aicourseprocessing
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aicourseprocessing
+  template:
+    metadata:
+      labels:
+        app: aicourseprocessing
+    spec:
+      containers:
+        - name: aiassessment-test
+          image: zednytawab/ai_course_processing:pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aicourseprocessing
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: aicourseprocessing
+  ports:
+    - name: aiassessment-test
+      protocol: TCP
+      port: 80
+      targetPort: 80

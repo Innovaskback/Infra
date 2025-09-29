@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-leaderboard-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-leaderboard-test
+  template:
+    metadata:
+      labels:
+        app: ba-leaderboard-test
+    spec:
+      containers:
+        - name: leaderboard-test
+          image: zednytawab/leaderboard:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-leaderboard-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-leaderboard-test
+  ports:
+    - name: leaderboard-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

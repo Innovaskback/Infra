@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-auth-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-auth-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-auth-ksa
+    spec:
+      containers:
+        - name: auth-ksa
+          image: zednytawab/authentication:be-ksa
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-auth-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-auth-ksa
+  ports:
+    - name: auth-ksa
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

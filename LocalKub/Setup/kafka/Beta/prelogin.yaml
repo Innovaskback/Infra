@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-prelogin-beta
+  namespace: beta
+  labels:
+    app: fe-prelogin-beta
+    tier: frontend
+    environment: beta
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fe-prelogin-beta
+  template:
+    metadata:
+      labels:
+        app: fe-prelogin-beta
+        tier: frontend
+        environment: beta
+    spec:
+      containers:
+        - name: prelogin-beta
+          image: zednytawab/prelogin:fe-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          
+          # Resource limits - slightly increased for troubleshooting
+          resources:
+            requests:
+              memory: "256Mi"          # Increased from 128Mi
+              cpu: "200m"              # Increased from 100m
+            limits:
+              memory: "1Gi"            # Increased from 512Mi
+              cpu: "1000m"             # Increased from 500m
+          
+          # Environment variables - try without NODE_ENV first
+          env:
+            - name: PORT
+              value: "3000"
+      
+      # Pull secrets for private registry
+      imagePullSecrets:
+        - name: regcred
+      
+      # Restart policy
+      restartPolicy: Always
+      
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-prelogin-beta
+  namespace: beta
+  labels:
+    app: fe-prelogin-beta
+    tier: frontend
+    environment: beta
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-prelogin-beta
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

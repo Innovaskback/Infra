@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-assessment-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-assessment-prod
+  template:
+    metadata:
+      labels:
+        app: fe-assessment-prod
+    spec:
+      containers:
+        - name: assessment-prod
+          image: zednytawab/assessment:fe-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-assessment-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-assessment-prod
+  ports:
+    - name: assessment-prod
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

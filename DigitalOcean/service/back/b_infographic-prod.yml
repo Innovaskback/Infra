@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-infographic-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-infographic-prod
+  template:
+    metadata:
+      labels:
+        app: ba-infographic-prod
+    spec:
+      containers:
+        - name: infographic-prod
+          image: zednytawab/infographic:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-infographic-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-infographic-prod
+  ports:
+    - name: infographic-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

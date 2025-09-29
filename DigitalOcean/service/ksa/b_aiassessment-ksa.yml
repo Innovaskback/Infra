@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-aiassessment-ksa
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ba-aiassessment-ksa
+  template:
+    metadata:
+      labels:
+        app: ba-aiassessment-ksa
+    spec:
+      containers:
+        - name: aiassessment-ksa
+          image: zednytawab/aiassessment:be-ksa
+          imagePullPolicy: Always          
+          ports:
+            - containerPort: 80
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-aiassessment-ksa
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-aiassessment-ksa
+  ports:
+    - name: aiassessment-ksa
+      protocol: TCP
+      port: 80
+      targetPort: 80

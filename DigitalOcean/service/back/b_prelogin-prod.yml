@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-prelogin-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-prelogin-prod
+  template:
+    metadata:
+      labels:
+        app: ba-prelogin-prod
+    spec:
+      containers:
+        - name: prelogin-prod
+          image: zednytawab/prelogin:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-prelogin-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-prelogin-prod
+  ports:
+    - name: prelogin-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

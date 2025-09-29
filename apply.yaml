@@ -1,0 +1,150 @@
+
+kubectl apply -f Google/watching.yml
+kubectl apply -f Google/ingress-ksa.yml
+
+kubectl apply -f Google/b_auth-ksa.yml
+kubectl apply -f Google/b_videoplayer-ksa.yml
+
+kubectl apply -f Google/prelogin-ksa.yml
+kubectl apply -f Google/videoplayer-ksa.yml
+
+
+
+
+kubectl apply -f LocalKub/Setup/Beta/prelogin.yaml
+kubectl apply -f LocalKub/Setup/Beta/b_admin.yaml
+kubectl apply -f LocalKub/Setup/Beta/ingress.yaml
+
+
+kubectl apply -f LocalKub/Setup/Production/prelogin.yaml
+kubectl apply -f LocalKub/Setup/Production/b_admin.yaml
+kubectl apply -f LocalKub/Setup/Production/ingress.yaml
+
+
+
+
+
+
+
+
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.13.3 --set installCRDs=true
+
+kubectl apply -f LocalKub/VideoConvert.yaml
+kubectl apply -f LocalKub/zednyvideoconvert.yaml
+kubectl apply -f LocalKub/aicourseprocessing.yaml
+
+kubectl rollout restart deploy aicourseprocessing -n production
+kubectl rollout status deployment/aicourseprocessing -n production
+
+
+
+kubectl apply -f DigitalOcean/ingress/ingress-beta.yml
+
+
+kubectl apply -f DigitalOcean/service/back/b_quizzesvideoplayer.yml
+kubectl apply -f DigitalOcean/service/back/b_quizzesvideoplayer-test.yml
+
+
+kubectl apply -f DigitalOcean/service/front/quizzesvideoplayer.yml
+kubectl apply -f DigitalOcean/service/front/quizzesvideoplayer-test.yml
+
+
+
+
+kubectl apply -f DigitalOcean/ingress/ingress-prod.yml
+
+kubectl apply -f LocalKub/ingress.yaml
+kubectl apply -f issuer.yaml
+
+
+
+kubectl apply -f ingress/ingress-beta.yml
+kubectl apply -f ingress/ingress-prod.yml
+kubectl apply -f ingress/ingress-prod-wildcard.yml
+
+
+kubectl apply -f service/front/admin-prod.yml
+kubectl apply -f service/front/admin-test.yml
+kubectl apply -f service/front/mindMap-prod.yml
+kubectl apply -f service/front/mindMap-test.yml
+kubectl apply -f service/front/assessment-prod.yml
+kubectl apply -f service/front/assessment-test.yml
+kubectl apply -f service/front/authormode-prod.yml
+kubectl apply -f service/front/authormode-test.yml
+kubectl apply -f service/front/auth-prod.yml
+kubectl apply -f service/front/auth-test.yml
+kubectl apply -f service/front/dashboard-prod.yml
+kubectl apply -f service/front/dashboard-test.yml
+kubectl apply -f service/front/infographic-prod.yml
+kubectl apply -f service/front/infographic-test.yml
+kubectl apply -f service/front/leaderBoard-prod.yml
+kubectl apply -f service/front/leaderBoard-test.yml
+kubectl apply -f service/front/orgchart-prod.yml
+kubectl apply -f service/front/orgchart-test.yml
+kubectl apply -f service/front/prelogin-prod.yml
+kubectl apply -f service/front/prelogin-test.yml
+kubectl apply -f service/front/products-prod.yml
+kubectl apply -f service/front/products-test.yml
+kubectl apply -f service/front/quizzes-prod.yml
+kubectl apply -f service/front/quizzes-test.yml
+kubectl apply -f service/front/videoplayer-prod.yml
+kubectl apply -f service/front/videoplayer-test.yml
+kubectl apply -f service/back/b_admin-prod.yml
+kubectl apply -f service/back/b_admin-test.yml
+kubectl apply -f service/back/b_aiassessment-prod.yml
+kubectl apply -f service/back/b_aiassessment-test.yml
+kubectl apply -f service/back/b_assessment-prod.yml
+kubectl apply -f service/back/b_assessment-test.yml
+kubectl apply -f service/back/b_authormode-prod.yml
+kubectl apply -f service/back/b_authormode-test.yml
+kubectl apply -f service/back/b_auth-prod.yml
+kubectl apply -f service/back/b_auth-test.yml
+kubectl apply -f service/back/b_dashboard-prod.yml
+kubectl apply -f service/back/b_dashboard-test.yml
+kubectl apply -f service/back/b_infographic-prod.yml
+kubectl apply -f service/back/b_infographic-test.yml
+kubectl apply -f service/back/b_leaderBoard-prod.yml
+kubectl apply -f service/back/b_leaderBoard-test.yml
+kubectl apply -f service/back/b_orgchart-prod.yml
+kubectl apply -f service/back/b_orgchart-test.yml
+kubectl apply -f service/back/b_prelogin-prod.yml
+kubectl apply -f service/back/b_prelogin-test.yml
+kubectl apply -f service/back/b_products-prod.yml
+kubectl apply -f service/back/b_products-test.yml
+kubectl apply -f service/back/b_mindMap-prod.yml
+kubectl apply -f service/back/b_mindMap-test.yml
+kubectl apply -f service/back/b_quizzes-prod.yml
+kubectl apply -f service/back/b_quizzes-test.yml
+kubectl apply -f service/back/b_videoplayer-prod.yml
+kubectl apply -f service/back/b_videoplayer-test.yml
+kubectl apply -f service/back/b_pdfreport-prod.yml
+kubectl apply -f service/back/b_pdfreport-test.yml
+kubectl apply -f service/back/ba-sharing-prod.yml
+kubectl apply -f service/back/ba-sharing-test.yml
+
+kubectl create namespace sql-ha
+kubectl apply -f sql/b_witness.yml
+
+
+
+
+#kubectl apply -f service/front/oldsite.yml
+#kubectl apply -f service/front/oldzedny-prod.yml
+#kubectl apply -f service/front/oldzedny-test.yml
+
+#kubectl apply -f service/back/b_oldzedny-prod.yml
+#kubectl apply -f service/back/b_oldzedny-test.yml
+
+#--------------------------------------------------------------------------
+
+kubectl get namespaces --sort-by=.metadata.creationTimestamp
+kubectl get deployment --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get ingress -A --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get pvc --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get services --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get pods -A --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get configmap --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get secret --all-namespaces --sort-by=.metadata.creationTimestamp
+kubectl get networkpolicy --all-namespaces --sort-by=.metadata.creationTimestamp
+

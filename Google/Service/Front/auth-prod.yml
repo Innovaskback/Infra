@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-auth-prod
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fe-auth-prod
+  template:
+    metadata:
+      labels:
+        app: fe-auth-prod
+    spec:
+      containers:
+        - name: auth-prod
+          image: zednytawab/authentication:fe-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-auth-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-auth-prod
+  ports:
+    - name: auth-prod
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

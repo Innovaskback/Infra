@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-auth-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-auth-prod
+  template:
+    metadata:
+      labels:
+        app: ba-auth-prod
+    spec:
+      containers:
+        - name: auth-prod
+          image: zednytawab/authentication:be-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-auth-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-auth-prod
+  ports:
+    - name: auth-prod
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

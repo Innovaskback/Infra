@@ -1,0 +1,157 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-beta
+  namespace: testing
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/from-to-www-redirect: "true"
+
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: beta.zedny.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: fe-prelogin-test
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-auth-test
+                port:
+                  number: 3000
+            path: /authentication
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-products-test
+                port:
+                  number: 3000
+            path: /products
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-videoplayer-test
+                port:
+                  number: 3000
+            path: /videoplayer
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-assessment-test
+                port:
+                  number: 3000
+            path: /assessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-dashboard-test
+                port:
+                  number: 3000
+            path: /dashboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-leaderboard-test
+                port:
+                  number: 3000
+            path: /leaderboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: fe-infographic-test
+                port:
+                  number: 3000
+            path: /infographic
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-admin-test
+                port:
+                  number: 8080
+            path: /b_admin
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-aiassessment-test
+                port:
+                  number: 80
+            path: /b_aiassessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-prelogin-test
+                port:
+                  number: 8080
+            path: /b_prelogin
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-auth-test
+                port:
+                  number: 8080
+            path: /b_authentication
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-products-test
+                port:
+                  number: 8080
+            path: /b_products
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-assessment-test
+                port:
+                  number: 8080
+            path: /b_assessment
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-dashboard-test
+                port:
+                  number: 8080
+            path: /b_dashboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-leaderboard-test
+                port:
+                  number: 8080
+            path: /b_leaderboard
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-infographic-test
+                port:
+                  number: 8080
+            path: /b_infographic
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-sharing-test
+                port:
+                  number: 8080
+            path: /b_sharing
+            pathType: Prefix
+          - backend:
+              service:
+                name: ba-quizzesvideoplayer-test
+                port:
+                  number: 8080
+            path: /b_quizzesvideoplayer
+            pathType: Prefix
+
+  tls:
+    - hosts:
+        - beta.zedny.com
+      secretName: tls-secret-prod
+status:
+  loadBalancer:
+    ingress:
+      - ip: 144.126.246.191

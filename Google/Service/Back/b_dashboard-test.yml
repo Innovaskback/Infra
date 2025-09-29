@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-dashboard-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-dashboard-test
+  template:
+    metadata:
+      labels:
+        app: ba-dashboard-test
+    spec:
+      containers:
+        - name: dashboard-test
+          image: zednytawab/dashboard:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-dashboard-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-dashboard-test
+  ports:
+    - name: dashboard-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

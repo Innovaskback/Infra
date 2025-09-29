@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-products-prod
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe-products-prod
+  template:
+    metadata:
+      labels:
+        app: fe-products-prod
+    spec:
+      containers:
+        - name: products-prod
+          image: zednytawab/products:fe-pr
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-products-prod
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: fe-products-prod
+  ports:
+    - name: products-prod
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

@@ -1,0 +1,104 @@
+# Enhanced Monitoring and Status Configuration
+server {
+    listen 127.0.0.1:8080;
+    listen [::1]:8080;
+    server_name localhost;
+    
+    # Access control
+    allow 127.0.0.1;
+    allow ::1;
+    allow 192.168.0.0/16;
+    allow 10.0.0.0/8;
+    deny all;
+    
+    # Nginx stub status
+    location /nginx_status {
+        stub_status on;
+        access_log off;
+    }
+    
+    # Detailed health check with upstream status
+    location /health {
+        access_log off;
+        default_type text/plain;
+        return 200 "Server Health: OK
+        Timestamp: $time_local
+        Server: $hostname
+        Nginx Version: $nginx_version
+        Connections Active: $connections_active
+        Connections Reading: $connections_reading
+        Connections Writing: $connections_writing
+        Connections Waiting: $connections_waiting\n";
+    }
+    
+    # JSON health check for monitoring tools
+    location /health/json {
+        access_log off;
+        default_type application/json;
+        return 200 '{
+    "status": "healthy",
+    "timestamp": "$time_iso8601",
+    "server": "$hostname",
+    "nginx_version": "$nginx_version",
+    "connections": {
+        "active": "$connections_active",
+        "reading": "$connections_reading",
+        "writing": "$connections_writing",
+        "waiting": "$connections_waiting"
+    }
+}';
+    }
+    
+    # Upstream status check
+    location /upstream/backend {
+        access_log off;
+        default_type text/plain;
+        
+        # Check backend servers health
+        proxy_pass http://backend_servers/health;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 5s;
+    }
+    
+    # Upstream storage status check  
+    location /upstream/storage {
+        access_log off;
+        default_type text/plain;
+        
+        # Check storage servers health
+        proxy_pass http://storage_servers/health;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 5s;
+    }
+    
+    # Configuration reload endpoint
+    # Note: For security, reload should be done via system commands
+    # location /reload {
+    #     # Disabled for security - use: sudo systemctl reload nginx
+    # }
+    
+    # Cache statistics
+    location /cache-status {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "Cache Zone Status\n================\n";
+    }
+    
+    # Active connections info
+    location /connections {
+        access_log off;
+        default_type text/html;
+        return 200 '<html>
+<head><title>Nginx Connections</title></head>
+<body>
+<h1>Active Connections Information</h1>
+<p>Active connections: $connections_active</p>
+<p>Reading: $connections_reading</p>
+<p>Writing: $connections_writing</p>
+<p>Waiting: $connections_waiting</p>
+<hr>
+<p>Server time: $time_local</p>
+</body>
+</html>';
+    }
+}

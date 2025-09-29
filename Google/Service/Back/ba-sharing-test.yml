@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-sharing-test
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ba-sharing-test
+  template:
+    metadata:
+      labels:
+        app: ba-sharing-test
+    spec:
+      containers:
+        - name: sharing-test
+          image: zednytawab/sharing:be-te
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-sharing-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-sharing-test
+  ports:
+    - name: sharing-test
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
