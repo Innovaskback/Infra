@@ -1457,6 +1457,13 @@ sudo ufw allow 22
 sudo ufw allow 80
 sudo ufw allow 443
 
+sudo chgrp tawab /var/www/hls/videos/
+sudo chmod g+rwx /var/www/hls/videos/
+
+sudo apt-get update
+sudo apt-get install certbot
+sudo apt-get install python3-certbot-nginx
+
 print_status "Firewall configured"
 
 # 15. Final status
