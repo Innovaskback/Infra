@@ -1,0 +1,385 @@
+# ==============================================================================
+# Ingress Configuration for IP-based Access (No SSL/TLS)
+# ==============================================================================
+# This configuration allows access to services via IP address without domain
+# ==============================================================================
+
+# ==============================================================================
+# 1. NGINX INGRESS CONTROLLER CONFIGURATION
+# ==============================================================================
+# ConfigMap to customize NGINX Ingress Controller behavior
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ingress-controller-config
+  namespace: ingress-nginx
+data:
+  # Allow large request bodies (for file uploads)
+  proxy-body-size: "50m"
+
+  # Connection timeouts
+  proxy-connect-timeout: "60"
+  proxy-send-timeout: "60"
+  proxy-read-timeout: "60"
+
+  # Enable real IP forwarding
+  use-forwarded-headers: "true"
+  compute-full-forwarded-for: "true"
+
+  # Custom headers
+  add-headers: "ingress-nginx/custom-headers"
+
+  # SSL configuration (disabled for IP-based access)
+  ssl-redirect: "false"
+  force-ssl-redirect: "false"
+
+  # CORS configuration
+  enable-cors: "true"
+  cors-allow-origin: "*"
+  cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+  cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+  cors-expose-headers: "Content-Length,Content-Range"
+  cors-allow-credentials: "true"
+  cors-max-age: "86400"
+
+---
+# ==============================================================================
+# 2. CUSTOM HEADERS CONFIGMAP
+# ==============================================================================
+# Add custom headers to all responses
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-headers
+  namespace: ingress-nginx
+data:
+  # Security headers
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+
+  # Custom headers
+  X-Powered-By: "Innovask Platform"
+
+---
+# ==============================================================================
+# 3. MAIN INGRESS - Testing Environment
+# ==============================================================================
+# Primary ingress for all testing services accessed via IP
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-testing-main
+  namespace: testing
+  labels:
+    app: testing-ingress
+    environment: testing
+  annotations:
+    # Ingress class
+    kubernetes.io/ingress.class: "nginx"
+
+    # Disable SSL redirect (important for IP-based access)
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Api-Key"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+
+    # Timeout settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "60"
+
+    # Body size limit
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+    # Buffer settings
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+
+    # Rate limiting (adjust as needed)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+
+    # Whitelist specific IPs (optional - remove if not needed)
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0"
+
+    # Custom error pages (optional)
+    # nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502,503"
+
+    # Rewrite annotations (if needed)
+    # nginx.ingress.kubernetes.io/rewrite-target: /$2
+
+    # Sticky sessions (if needed for stateful apps)
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+
+    # Health check configuration
+    nginx.ingress.kubernetes.io/health-check-path: "/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "10s"
+
+spec:
+  ingressClassName: nginx
+
+  # Rules without host (accepts any IP or domain)
+  rules:
+    - http:
+        paths:
+          # ================================================================
+          # Auth API Backend - Main authentication service
+          # ================================================================
+          # Path: /auth/* or /api/auth/*
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-auth-api-test
+                port:
+                  number: 8080
+
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-auth-api-test
+                port:
+                  number: 8080
+
+          # ================================================================
+          # Health check endpoint for Auth API
+          # ================================================================
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-auth-api-test
+                port:
+                  number: 8080
+
+          # ================================================================
+          # Admin Backend - Administrative operations
+          # ================================================================
+          # Path: /b_admin/*
+          - path: /b_admin
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-admin-beta
+                port:
+                  number: 8080
+
+          # ================================================================
+          # General API endpoint
+          # ================================================================
+          # Path: /api/*
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-admin-beta
+                port:
+                  number: 8080
+
+          # ================================================================
+          # Frontend - PreLogin (MUST be last - catches all remaining paths)
+          # ================================================================
+          # Path: /* (root and all unmatched paths)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fe-prelogin-beta
+                port:
+                  number: 3000
+
+---
+# ==============================================================================
+# 4. SEPARATE INGRESS FOR AUTH API (Alternative approach)
+# ==============================================================================
+# Dedicated ingress for Auth API with specific configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-auth-api
+  namespace: testing
+  labels:
+    app: auth-api-ingress
+    environment: testing
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+
+    # CORS for Auth API
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+
+    # Enhanced timeouts for Auth operations
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+
+    # Rate limiting for Auth API (more restrictive)
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+
+    # Request body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Use regex for path matching
+    nginx.ingress.kubernetes.io/use-regex: "true"
+
+    # Rewrite target to remove /auth prefix
+    # nginx.ingress.kubernetes.io/rewrite-target: /$2
+
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Auth API specific endpoints
+          - path: /auth/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ba-auth-api-test
+                port:
+                  number: 8080
+
+---
+# ==============================================================================
+# 5. METALLB IP ADDRESS POOL
+# ==============================================================================
+# Configure MetalLB to assign the external IP
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: testing-ip-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 69.10.55.229/32 # Your external IP address
+  autoAssign: true
+
+---
+# ==============================================================================
+# 6. METALLB L2 ADVERTISEMENT
+# ==============================================================================
+# Advertise the IP addresses using Layer 2 protocol
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: testing-l2-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - testing-ip-pool
+  # Specify which nodes should advertise (optional - defaults to all)
+  # nodeSelectors:
+  #   - matchLabels:
+  #       kubernetes.io/hostname: your-node-name
+
+---
+# ==============================================================================
+# 7. INGRESS CLASS DEFINITION
+# ==============================================================================
+# Define the NGINX ingress class
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+
+---
+# ==============================================================================
+# USAGE EXAMPLES AND TESTING
+# ==============================================================================
+# After applying these configurations, you can access services via:
+#
+# 1. Auth API:
+#    http://69.10.55.229/auth/api/users
+#    http://69.10.55.229/api/auth/login
+#    http://69.10.55.229/health
+#
+# 2. Admin Backend:
+#    http://69.10.55.229/b_admin/api/dashboard
+#    http://69.10.55.229/api/users
+#
+# 3. Frontend:
+#    http://69.10.55.229/
+#    http://69.10.55.229/login
+#    http://69.10.55.229/dashboard
+#
+# ==============================================================================
+# TESTING COMMANDS
+# ==============================================================================
+#
+# Test Auth API health:
+# curl -v http://69.10.55.229/health
+#
+# Test with CORS headers:
+# curl -H "Origin: http://example.com" \
+#      -H "Access-Control-Request-Method: POST" \
+#      -H "Access-Control-Request-Headers: X-Requested-With" \
+#      -X OPTIONS \
+#      http://69.10.55.229/auth/api/login
+#
+# Test Auth API endpoint:
+# curl -X POST http://69.10.55.229/auth/api/login \
+#      -H "Content-Type: application/json" \
+#      -d '{"username":"test","password":"test123"}'
+#
+# Check Ingress status:
+# kubectl get ingress -n testing
+# kubectl describe ingress ingress-testing-main -n testing
+#
+# Check NGINX Ingress Controller logs:
+# kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+#
+# ==============================================================================
+# TROUBLESHOOTING
+# ==============================================================================
+#
+# If you can't access the services:
+#
+# 1. Check if MetalLB is running:
+#    kubectl get pods -n metallb-system
+#
+# 2. Check if IP is assigned:
+#    kubectl get svc -n testing
+#    kubectl get svc ba-auth-api-test-external -n testing
+#
+# 3. Check Ingress Controller:
+#    kubectl get pods -n ingress-nginx
+#    kubectl get svc -n ingress-nginx
+#
+# 4. Check Ingress configuration:
+#    kubectl get ingress -n testing -o yaml
+#
+# 5. Test from inside cluster:
+#    kubectl run test-pod --rm -i --tty --image=curlimages/curl -- sh
+#    curl http://ba-auth-api-test.testing.svc.cluster.local:8080/health
+#
+# 6. Check firewall rules on your server:
+#    sudo iptables -L -n -v
+#    sudo ufw status (if using UFW)
+#
+# 7. Verify routes:
+#    ip route show
+#
+# ==============================================================================

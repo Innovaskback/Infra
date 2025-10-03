@@ -1,0 +1,628 @@
+# ==============================================================================
+# Kubernetes Deployment Configuration for Auth API
+# ==============================================================================
+# This file contains all necessary Kubernetes resources for deploying the
+# Authentication API to the testing environment with IP-based access
+# ==============================================================================
+
+# ==============================================================================
+# 1. NAMESPACE
+# ==============================================================================
+# Ensure the namespace exists
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testing
+  labels:
+    name: testing
+    environment: testing
+
+---
+# ==============================================================================
+# 2. CONFIGMAP - Non-sensitive configuration
+# ==============================================================================
+# Store non-sensitive application configuration that can be easily updated
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-api-config
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+data:
+  # ASP.NET Core Environment
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  
+  # JWT Configuration (non-sensitive parts)
+  Jwt__Issuer: "Auth_Api"
+  Jwt__Audience: "Auth_Api-Users"
+  Jwt__ExpiryDays: "15"
+  Jwt__RefreshTokenExpiryDays: "15"
+  
+  # Caching Configuration
+  Caching__DefaultExpirationMinutes: "30"
+  
+  # Rate Limiting
+  RateLimiting__RequestsPerMinute: "100"
+  
+  # Feature Flags
+  Features__UseRedis: "false"
+  Features__UseKafka: "true"
+  
+  # Kafka Configuration
+  Kafka__BootstrapServers: "kafka-0.kafka-headless.kafka.svc.cluster.local:9092,kafka-1.kafka-headless.kafka.svc.cluster.local:9092,kafka-2.kafka-headless.kafka.svc.cluster.local:9092"
+  Kafka__ClientId: "authentication-producer"
+  Kafka__AutoOffsetReset: "Earliest"
+  
+  # Redis Configuration
+  Redis__ConnectionString: "localhost:6379"
+  
+  # Frontend URL
+  FrontendUrl: "http://69.10.55.229"
+  
+  # Logging Configuration
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft: "Warning"
+  Logging__LogLevel__MicrosoftEntityFrameworkCore: "Information"
+  
+  # Serilog Configuration
+  Serilog__MinimumLevel__Default: "Information"
+  Serilog__MinimumLevel__Override__Microsoft: "Warning"
+  Serilog__MinimumLevel__Override__System: "Warning"
+  
+  # Allowed Hosts
+  AllowedHosts: "*"
+
+---
+# ==============================================================================
+# 3. SECRET - Sensitive configuration
+# ==============================================================================
+# This secret will be created/updated by GitHub Actions
+# This is just a template showing the structure
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-api-secrets
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+type: Opaque
+stringData:
+  # Database Configuration
+  SQL_SERVER_IP: "PLACEHOLDER"
+  SQL_USER: "PLACEHOLDER"
+  SQL_PASSWORD: "PLACEHOLDER"
+  
+  # JWT Secret Key
+  JWT_SECRET_KEY: "PLACEHOLDER"
+  
+  # Encryption Key
+  ENCRYPTION_KEY: "KubeD=#@$&"
+  
+  # Zoho Integration
+  ZOHO_KEY: "PLACEHOLDER"
+  
+  # Social Authentication - Google
+  GOOGLE_CLIENT_ID: "PLACEHOLDER"
+  GOOGLE_CLIENT_SECRET: "PLACEHOLDER"
+  
+  # Social Authentication - Facebook
+  FACEBOOK_APP_ID: "PLACEHOLDER"
+  FACEBOOK_APP_SECRET: "PLACEHOLDER"
+  
+  # Social Authentication - Microsoft
+  MICROSOFT_CLIENT_ID: "PLACEHOLDER"
+  MICROSOFT_CLIENT_SECRET: "PLACEHOLDER"
+  
+  # Social Authentication - Apple
+  APPLE_CLIENT_ID: "PLACEHOLDER"
+  APPLE_CLIENT_SECRET: "PLACEHOLDER"
+  APPLE_KEY_ID: "PLACEHOLDER"
+  APPLE_TEAM_ID: "PLACEHOLDER"
+  APPLE_PRIVATE_KEY: "PLACEHOLDER"
+
+---
+# ==============================================================================
+# 4. DEPLOYMENT
+# ==============================================================================
+# Main application deployment with enhanced configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ba-auth-api-test
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+    version: v1
+    environment: testing
+    component: backend
+spec:
+  # Number of pod replicas
+  replicas: 2
+  
+  # Keep only last 3 revisions for rollback
+  revisionHistoryLimit: 3
+  
+  # Rolling update strategy for zero-downtime deployment
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # Allow 1 extra pod during update
+      maxUnavailable: 0    # Ensure at least 2 pods are always available
+  
+  # Pod selector
+  selector:
+    matchLabels:
+      app: ba-auth-api-test
+  
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: ba-auth-api-test
+        version: v1
+      annotations:
+        # Prometheus scraping configuration (if using Prometheus)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    
+    spec:
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Pull secrets for private Docker registry
+      imagePullSecrets:
+        - name: regcred
+      
+      # Init containers (if needed for pre-startup tasks)
+      # initContainers:
+      #   - name: wait-for-database
+      #     image: busybox:latest
+      #     command: ['sh', '-c', 'until nc -z ${SQL_SERVER_IP} 1433; do echo waiting for database; sleep 2; done']
+      
+      # Main application container
+      containers:
+        - name: auth-api-test
+          image: tawabsoft/innovask:auth-be-te-latest
+          imagePullPolicy: Always
+          
+          # Container ports
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          
+          # Environment variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: auth-api-config
+          
+          # Environment variables from Secrets
+          env:
+            # Database connection string (constructed from secrets)
+            - name: ConnectionStrings__DefaultConnection
+              value: "Data Source=$(SQL_SERVER_IP);Initial Catalog=AuthApi;Integrated Security=False;User ID=$(SQL_USER);Password=$(SQL_PASSWORD);Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10;ApplicationIntent=ReadWrite;MultiSubnetFailover=False"
+            
+            # Serilog connection string
+            - name: Serilog__WriteTo__1__Args__connectionString
+              value: "Data Source=$(SQL_SERVER_IP);Initial Catalog=Auth_Serilog;Integrated Security=False;User ID=$(SQL_USER);Password=$(SQL_PASSWORD);Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10;ApplicationIntent=ReadWrite;MultiSubnetFailover=False"
+            
+            # Individual secret values
+            - name: SQL_SERVER_IP
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: SQL_SERVER_IP
+            
+            - name: SQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: SQL_USER
+            
+            - name: SQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: SQL_PASSWORD
+            
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: JWT_SECRET_KEY
+            
+            - name: EncryptionSettings__EncKey
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: ENCRYPTION_KEY
+            
+            - name: ZohoKey
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: ZOHO_KEY
+            
+            # Google OAuth
+            - name: Authentication__Google__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: GOOGLE_CLIENT_ID
+            
+            - name: Authentication__Google__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: GOOGLE_CLIENT_SECRET
+            
+            # Facebook OAuth
+            - name: Authentication__Facebook__AppId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: FACEBOOK_APP_ID
+            
+            - name: Authentication__Facebook__AppSecret
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: FACEBOOK_APP_SECRET
+            
+            # Microsoft OAuth
+            - name: Authentication__Microsoft__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: MICROSOFT_CLIENT_ID
+            
+            - name: Authentication__Microsoft__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: MICROSOFT_CLIENT_SECRET
+            
+            # Apple OAuth
+            - name: Authentication__Apple__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: APPLE_CLIENT_ID
+            
+            - name: Authentication__Apple__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: APPLE_CLIENT_SECRET
+            
+            - name: Authentication__Apple__KeyId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: APPLE_KEY_ID
+            
+            - name: Authentication__Apple__TeamId
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: APPLE_TEAM_ID
+            
+            - name: Authentication__Apple__PrivateKey
+              valueFrom:
+                secretKeyRef:
+                  name: auth-api-secrets
+                  key: APPLE_PRIVATE_KEY
+          
+          # Resource requests and limits
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          
+          # Liveness probe - checks if container needs to be restarted
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          
+          # Readiness probe - checks if container is ready to serve traffic
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          
+          # Startup probe - gives extra time for application startup
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 20  # 20 * 5 = 100 seconds max startup time
+          
+          # Container security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts (if needed)
+          # volumeMounts:
+          #   - name: temp
+          #     mountPath: /tmp
+      
+      # Volumes (if needed)
+      # volumes:
+      #   - name: temp
+      #     emptyDir: {}
+      
+      # Pod disruption budget to ensure high availability during updates
+      # (defined separately below)
+
+---
+# ==============================================================================
+# 5. SERVICE - ClusterIP
+# ==============================================================================
+# Internal service for pod communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-auth-api-test
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+spec:
+  type: ClusterIP
+  selector:
+    app: ba-auth-api-test
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: http
+  # Session affinity to maintain user sessions
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+
+---
+# ==============================================================================
+# 6. SERVICE - LoadBalancer (for direct IP access)
+# ==============================================================================
+# External service using MetalLB to expose via IP address
+apiVersion: v1
+kind: Service
+metadata:
+  name: ba-auth-api-test-external
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+  annotations:
+    # MetalLB configuration
+    metallb.universe.tf/allow-shared-ip: "auth-api-test"
+spec:
+  type: LoadBalancer
+  # Specify the external IP (MetalLB will assign this)
+  loadBalancerIP: 69.10.55.229
+  selector:
+    app: ba-auth-api-test
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80        # External port (HTTP standard)
+      targetPort: 8080  # Container port
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+# ==============================================================================
+# 7. HORIZONTAL POD AUTOSCALER
+# ==============================================================================
+# Automatically scale pods based on CPU and memory usage
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ba-auth-api-test-hpa
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+  spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ba-auth-api-test
+  
+  # Minimum and maximum number of replicas
+  minReplicas: 2
+  maxReplicas: 10
+  
+  # Metrics for scaling decisions
+  metrics:
+    # CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    
+    # Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  
+  # Scaling behavior
+  behavior:
+    # Scale down policy
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 minutes before scaling down
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min  # Use the policy that scales down the least
+    
+    # Scale up policy
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Scale up immediately
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max  # Use the policy that scales up the most
+
+---
+# ==============================================================================
+# 8. POD DISRUPTION BUDGET
+# ==============================================================================
+# Ensure minimum availability during voluntary disruptions
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ba-auth-api-test-pdb
+  namespace: testing
+  labels:
+    app: ba-auth-api-test
+spec:
+  minAvailable: 1  # Always keep at least 1 pod running
+  selector:
+    matchLabels:
+      app: ba-auth-api-test
+
+---
+# ==============================================================================
+# 9. NETWORK POLICY (Optional - for additional security)
+# ==============================================================================
+# Control network traffic to/from pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ba-auth-api-test-netpol
+  namespace: testing
+spec:
+  podSelector:
+    matchLabels:
+      app: ba-auth-api-test
+  
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # Ingress rules - who can connect to this pod
+  ingress:
+    # Allow traffic from Ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    
+    # Allow traffic from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: testing
+      ports:
+        - protocol: TCP
+          port: 8080
+  
+  # Egress rules - where this pod can connect to
+  egress:
+    # Allow DNS queries
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Allow connection to database
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 1433
+    
+    # Allow connection to Kafka
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    
+    # Allow HTTPS to external services (OAuth providers, etc.)
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+---
+# ==============================================================================
+# 10. SERVICE MONITOR (for Prometheus - Optional)
+# ==============================================================================
+# Enable Prometheus monitoring for the application
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: ba-auth-api-test-monitor
+#   namespace: testing
+#   labels:
+#     app: ba-auth-api-test
+# spec:
+#   selector:
+#     matchLabels:
+#       app: ba-auth-api-test
+#   endpoints:
+#     - port: http
+#       path: /metrics
+#       interval: 30s

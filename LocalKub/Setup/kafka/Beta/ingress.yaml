@@ -14,7 +14,7 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 64.20.63.4-64.20.63.4  # Your server's external IP address
+  - 69.10.55.229  # Your server's external IP address
   autoAssign: true           # Automatically assign IPs from this pool
 
 ---

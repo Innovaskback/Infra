@@ -17,3 +17,14 @@ sudo ./setup.sh
 sudo chown -R tawab:tawab /var/www/hls/videos/
 
 
+--Free SSL
+sudo apt-get update
+
+
+sudo apt-get install certbot
+sudo apt-get install python3-certbot-nginx
+
+
+sudo certbot --nginx -d st.innovask.com -d www.st.innovask.com
+
+

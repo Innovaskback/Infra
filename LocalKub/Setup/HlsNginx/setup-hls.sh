@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fixed HLS Server Setup Script - No Configuration Errors
+# Fixed HLS Server Setup Script - CORS Configured for Specific Domains
 # Optimized for Educational Platform with Pre-encoded Videos
 # Target: Ubuntu Server 24.04 LTS, 8 cores, 32GB RAM, 1Gbps
 # Focus: Stability and Maximum Concurrent Users
@@ -73,7 +73,6 @@ sudo chmod -R 755 $HLS_ROOT
 
 # Add current user to www-data group for easy file uploads
 current_user="$USER"
-#current_user=$(whoami)
 sudo usermod -a -G www-data $current_user
 sudo chown -R $current_user:$current_user /var/www/hls/videos/
 
@@ -142,7 +141,7 @@ print_status "Step 6: Updating systemd settings..."
 sudo sed -i 's/#DefaultLimitNOFILE=.*/DefaultLimitNOFILE=1000000/' /etc/systemd/system.conf
 sudo systemctl daemon-reload
 
-# 7. Configure Nginx Main Settings (FIXED - No duplicate MIME types)
+# 7. Configure Nginx Main Settings
 print_status "Step 7: Configuring Nginx main settings..."
 sudo tee /etc/nginx/nginx.conf > /dev/null << 'EOF'
 # High Performance HLS Server Configuration
@@ -167,7 +166,7 @@ http {
     tcp_nodelay on;
     keepalive_timeout 65;
     keepalive_requests 1000;
-    server_tokens off;  # Hide nginx version for security
+    server_tokens off;
     
     # Buffer settings
     client_body_buffer_size 128k;
@@ -181,19 +180,19 @@ http {
     send_timeout 60s;
     reset_timedout_connection on;
     
-    # MIME types (using default + HLS specific)
+    # MIME types
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
     
     # Logging format optimized for HLS
     log_format hls '$remote_addr - [$time_local] "$request" '
                    '$status $body_bytes_sent rt=$request_time '
-                   '"$http_user_agent"';
+                   '"$http_user_agent" origin="$http_origin"';
     
     access_log /var/log/nginx/access.log hls buffer=32k;
     error_log /var/log/nginx/error.log warn;
     
-    # Gzip compression (lightweight for better CPU performance)
+    # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_comp_level 2;
@@ -206,13 +205,23 @@ http {
     open_file_cache_min_uses 2;
     open_file_cache_errors on;
     
-    # Rate limiting zones (essential for stability)
+    # Rate limiting zones
     limit_conn_zone $binary_remote_addr zone=addr:10m;
     limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
     
     # Default bandwidth limit per connection
-    limit_rate_after 2m;  # First 2MB at full speed
-    limit_rate 3m;        # Then 3MB/s per connection
+    limit_rate_after 2m;
+    limit_rate 3m;
+    
+    # CORS allowed origins mapping
+    map $http_origin $cors_origin {
+        default "";
+        "http://localhost" $http_origin;
+        "https://innovask.com" $http_origin;
+        "https://www.innovask.com" $http_origin;
+        "~^http://localhost:[0-9]+$" $http_origin;
+        "~^http://127\.0\.0\.1(:[0-9]+)?$" $http_origin;
+    }
     
     # Include configurations
     include /etc/nginx/conf.d/*.conf;
@@ -220,24 +229,24 @@ http {
 }
 EOF
 
-# 8. Create HLS Server Configuration (FIXED - No unknown directives)
+# 8. Create HLS Server Configuration with CORS
 print_status "Step 8: Creating HLS server configuration..."
 sudo tee /etc/nginx/sites-available/hls.conf > /dev/null << 'EOF'
 # HLS Server Configuration for Educational Platform
-# Optimized for stability and maximum concurrent users
+# CORS configured for localhost and innovask.com only
 
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
-    server_name _;
+    server_name innovask.com www.innovask.com _;
     root /var/www/hls;
     index index.html;
     
-    # Security: Hide server information (using standard method)
+    # Security settings
     server_tokens off;
     
-    # Connection limits (essential for stability)
-    limit_conn addr 50;  # Max 50 connections per IP
+    # Connection limits
+    limit_conn addr 50;
     limit_req zone=api burst=60 nodelay;
     
     # Security: Block common attack patterns
@@ -253,29 +262,34 @@ server {
         return 404;
     }
     
-    # Security: Block hidden files and sensitive extensions
     location ~ /\. {
         deny all;
         access_log off;
         return 404;
     }
     
-    # Security: Block common vulnerability scan files
     location ~ /(settings\.cfg|settings\.py|robomongo\.json|config/config\.js)$ {
         deny all;
         access_log off;
         return 404;
     }
     
-    # CORS headers (required for educational platforms)
-    add_header Access-Control-Allow-Origin * always;
-    add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "Range, If-None-Match" always;
-    add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
-    
     # Main HLS video location
     location /videos/ {
-        # Enable directory listing
+        # CORS Headers for videos
+        add_header Access-Control-Allow-Origin $cors_origin always;
+        add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Range, If-None-Match, Origin, Accept, Content-Type, Authorization" always;
+        add_header Access-Control-Expose-Headers "Content-Length, Content-Range, Accept-Ranges" always;
+        add_header Access-Control-Allow-Credentials "true" always;
+        add_header Access-Control-Max-Age 3600 always;
+        
+        # Handle OPTIONS
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+        
+        # Directory listing
         autoindex on;
         autoindex_format html;
         
@@ -285,65 +299,76 @@ server {
         open_file_cache_min_uses 1;
         open_file_cache_errors on;
         
-        # M3U8 playlist files (short cache for live-like experience)
+        # M3U8 playlist files
         location ~ \.m3u8$ {
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Range, If-None-Match, Origin, Accept, Content-Type" always;
+            add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
+            add_header Access-Control-Allow-Credentials "true" always;
             add_header Content-Type "application/vnd.apple.mpegurl" always;
             add_header Cache-Control "public, max-age=5, s-maxage=5" always;
             expires 5s;
         }
         
-        # TS segment files (long cache for bandwidth efficiency)
+        # TS segment files
         location ~ \.ts$ {
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Range, If-None-Match, Origin, Accept, Content-Type" always;
+            add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
+            add_header Access-Control-Allow-Credentials "true" always;
             add_header Content-Type "video/mp2t" always;
             add_header Cache-Control "public, max-age=86400, immutable" always;
+            add_header Accept-Ranges bytes always;
             expires 24h;
             
-            # Enable range requests for better seeking
-            add_header Accept-Ranges bytes always;
-            
-            # Bandwidth optimization per connection
-            limit_rate_after 1m;  # First 1MB at full speed
-            limit_rate 2m;        # Then 2MB/s per connection
+            limit_rate_after 1m;
+            limit_rate 2m;
         }
         
-        # MP4 files (if needed for fallback)
+        # MP4 files
         location ~ \.mp4$ {
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Range, If-None-Match, Origin, Accept, Content-Type" always;
+            add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
+            add_header Access-Control-Allow-Credentials "true" always;
             add_header Content-Type "video/mp4" always;
             add_header Cache-Control "public, max-age=86400" always;
-            expires 24h;
-            
-            # Range requests for video seeking
             add_header Accept-Ranges bytes always;
+            expires 24h;
         }
         
         try_files $uri $uri/ =404;
     }
     
-    # Health check endpoint
+    # Health check
     location /health {
         access_log off;
-        return 200 "HLS Server OK - Educational Platform\n";
         add_header Content-Type text/plain;
+        return 200 "HLS Server OK\n";
     }
     
-    # Nginx status (restricted to localhost only)
+    # Nginx status
     location /nginx_status {
         stub_status on;
         access_log off;
         allow 127.0.0.1;
         allow ::1;
-        allow 10.0.0.0/8;     # Private networks
-        allow 172.16.0.0/12;  # Private networks  
-        allow 192.168.0.0/16; # Private networks
+        allow 10.0.0.0/8;
+        allow 172.16.0.0/12;
+        allow 192.168.0.0/16;
         deny all;
     }
     
     # Main page
     location / {
+        add_header Access-Control-Allow-Origin $cors_origin always;
         try_files $uri $uri/ /index.html;
     }
     
-    # Custom error pages
+    # Error pages
     error_page 404 /404.html;
     error_page 403 /403.html;
     error_page 500 502 503 504 /50x.html;
@@ -365,7 +390,6 @@ print_status "Step 10: Creating management script..."
 sudo tee /usr/local/bin/hls-manager > /dev/null << 'EOF'
 #!/bin/bash
 # HLS Server Management Script
-# Simplified for educational platform
 
 VIDEOS_DIR="/var/www/hls/videos"
 CACHE_DIR="/var/cache/nginx/hls"
@@ -441,66 +465,57 @@ case "$1" in
         echo "Video Count: $(find $VIDEOS_DIR -name "*.m3u8" 2>/dev/null | wc -l) playlists"
         echo "Cache Size: $(du -sh $CACHE_DIR 2>/dev/null | awk '{print $1}' || echo '0')"
         echo "Server IP: $(curl -s ifconfig.me 2>/dev/null || echo 'Not available')"
+        echo "Allowed Origins: localhost, innovask.com"
+        ;;
+    
+    cors-test)
+        echo "=== Testing CORS Configuration ==="
+        echo "Testing from localhost..."
+        curl -I -H "Origin: http://localhost" http://127.0.0.1/videos/ 2>/dev/null | grep -i "access-control"
+        echo ""
+        echo "Testing from innovask.com..."
+        curl -I -H "Origin: https://innovask.com" http://127.0.0.1/videos/ 2>/dev/null | grep -i "access-control"
         ;;
     
     security)
         echo "=== Security Status ==="
         echo "Firewall: $(sudo ufw status | head -1)"
         echo "Failed login attempts (last 24h): $(sudo grep "authentication failure" /var/log/auth.log | grep "$(date '+%b %d')" | wc -l 2>/dev/null || echo '0')"
+        echo "Allowed CORS Origins: localhost, innovask.com"
         echo "Recent blocked IPs:"
         sudo tail -20 /var/log/nginx/error.log | grep "access forbidden" | awk '{print $10}' | sort | uniq -c | sort -rn | head -5
         ;;
     
     *)
         echo "HLS Server Management Tool"
-        echo "Usage: $0 {start|stop|restart|reload|status|test|logs|errors|clear-cache|info|security}"
+        echo "Usage: $0 {start|stop|restart|reload|status|test|logs|errors|clear-cache|info|cors-test|security}"
         echo ""
         echo "Common commands:"
-        echo "  status    - Show server status and connections"
-        echo "  logs      - Show live access logs"
-        echo "  errors    - Show live error logs"
-        echo "  info      - Show server information"
-        echo "  security  - Show security status"
+        echo "  status     - Show server status and connections"
+        echo "  cors-test  - Test CORS configuration"
+        echo "  logs       - Show live access logs"
+        echo "  errors     - Show live error logs"
+        echo "  info       - Show server information"
+        echo "  security   - Show security status"
         exit 1
         ;;
 esac
 EOF
 
-# Make management script executable
 sudo chmod +x /usr/local/bin/hls-manager
 
-# 11. Update System Limits
-print_status "Step 11: Updating system limits..."
-sudo tee /etc/security/limits.d/99-nginx.conf > /dev/null << 'EOF'
-# System limits for high-performance nginx
-* soft nofile 1000000
-* hard nofile 1000000
-www-data soft nofile 1000000
-www-data hard nofile 1000000
-nginx soft nofile 1000000
-nginx hard nofile 1000000
-root soft nofile 1000000
-root hard nofile 1000000
-EOF
-
-# 12. Update systemd settings
-print_status "Step 12: Updating systemd settings..."
-sudo sed -i 's/#DefaultLimitNOFILE=.*/DefaultLimitNOFILE=1000000/' /etc/systemd/system.conf
-sudo systemctl daemon-reload
-
-# 13. Create Web Pages
-print_status "Step 13: Creating web interface..."
+# 11. Create Web Pages
+print_status "Step 11: Creating web interface..."
 
 # Main index page
 sudo tee $HLS_ROOT/index.html > /dev/null << 'EOF'
 <!DOCTYPE html>
 <html>
-
 <head>
-  <title>Zedny St_07</title>
-  <link rel="icon" type="image/x-icon" href="https://firebasestorage.googleapis.com/v0/b/zedny-eg.appspot.com/o/Logo%2FTree.svg?alt=media&token=0c690e6a-bfa4-46b6-b9a6-da1c1b8320bb">
-  <link rel="stylesheet" media="all"
-    href="https://cpwebassets.codepen.io/assets/editor/editor-1c1e1bc9a9c19175444f3aa742f0ec1dee2998210a113bb12379a9ec9420f3c5.css" />
+  <title>InnovAsk</title>
+  <link rel="icon" type="image/x-icon" href="https://pxpgnrvttlopkmlbwelc.supabase.co/storage/v1/object/public/innovaskStorage/S_Logo.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <script>
   anime({
@@ -583,8 +598,7 @@ sudo tee $HLS_ROOT/index.html > /dev/null << 'EOF'
 </style>
 
 <body>
-
-  <a target="_blank" href="https://zedny.com/">
+  <a target="_blank" href="https://innovask.com/">
     <div class="container">
       <div class="row">
         <div class="col-sm-12 col-md-12 mt-5 mb-5">
@@ -1212,19 +1226,17 @@ sudo tee $HLS_ROOT/index.html > /dev/null << 'EOF'
     </div>
   </a>
 
-</body>
 </html>
 EOF
 
-
-# player page
+# Player page with CORS test
 sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HLS Video Player</title>
+    <title>HLS Video Player - CORS Enabled</title>
     <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">
     <style>
         body {
@@ -1241,6 +1253,18 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
         h1 {
             text-align: center;
             color: #00ff00;
+        }
+        .cors-status {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .cors-ok {
+            color: #00ff00;
+        }
+        .cors-error {
+            color: #ff0000;
         }
         .video-container {
             margin: 20px 0;
@@ -1260,28 +1284,6 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
             border-radius: 10px;
             margin-top: 20px;
         }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .stat {
-            background: #333;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 24px;
-            color: #00ff00;
-            font-weight: bold;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #999;
-            margin-top: 5px;
-        }
         #urlInput {
             width: 100%;
             padding: 10px;
@@ -1299,6 +1301,7 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
+            margin-right: 10px;
         }
         button:hover {
             background: #00cc00;
@@ -1307,12 +1310,17 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
 </head>
 <body>
     <div class="container">
-        <h1>🎬 HLS Video Player</h1>
+        <h1>HLS Video Player (CORS Enabled)</h1>
+        
+        <div class="cors-status" id="corsStatus">
+            <strong>CORS Status:</strong> <span id="corsResult">Testing...</span>
+        </div>
         
         <div class="info">
-            <label>M3U8 File URL:</label>
-            <input type="text" id="urlInput" placeholder="File path" value="">
+            <label>M3U8 File Path:</label>
+            <input type="text" id="urlInput" placeholder="course-name/lesson" value="">
             <button onclick="loadVideo()">Play Video</button>
+            <button onclick="testCORS()">Test CORS</button>
         </div>
         
         <div class="video-container">
@@ -1324,30 +1332,35 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
                 data-setup='{"fluid": true}'>
             </video>
         </div>
-        
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-value" id="resolution">--</div>
-                <div class="stat-label">Resolution</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="bitrate">--</div>
-                <div class="stat-label">Bitrate</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="buffer">--</div>
-                <div class="stat-label">Buffer (Seconds)</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="dropped">0</div>
-                <div class="stat-label">Dropped Frames</div>
-            </div>
-        </div>
     </div>
     
     <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
     <script>
         let player;
+        
+        function testCORS() {
+            const statusEl = document.getElementById('corsResult');
+            statusEl.textContent = 'Testing...';
+            statusEl.className = '';
+            
+            fetch(window.location.origin + '/videos/', {
+                method: 'HEAD',
+                mode: 'cors'
+            })
+            .then(response => {
+                if (response.ok) {
+                    statusEl.textContent = 'CORS working correctly!';
+                    statusEl.className = 'cors-ok';
+                } else {
+                    statusEl.textContent = 'CORS issue detected: ' + response.status;
+                    statusEl.className = 'cors-error';
+                }
+            })
+            .catch(error => {
+                statusEl.textContent = 'CORS Error: ' + error.message;
+                statusEl.className = 'cors-error';
+            });
+        }
         
         function initPlayer() {
             player = videojs('hlsPlayer', {
@@ -1360,7 +1373,6 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
             
             player.ready(function() {
                 console.log('Player is ready');
-                updateStats();
             });
             
             player.on('error', function(e) {
@@ -1369,7 +1381,9 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
         }
         
         function loadVideo() {
-            const url = `videos/` + document.getElementById('urlInput').value + `/index.m3u8`;
+            const path = document.getElementById('urlInput').value;
+            const url = `/videos/${path}/index.m3u8`;
+            
             if (!player) {
                 initPlayer();
             }
@@ -1382,201 +1396,78 @@ sudo tee $HLS_ROOT/player.html > /dev/null << 'EOF'
             player.play();
         }
         
-        function updateStats() {
-            if (player && player.tech_) {
-                const tech = player.tech_;
-                
-                // Resolution
-                if (player.videoWidth() && player.videoHeight()) {
-                    document.getElementById('resolution').textContent = 
-                        player.videoWidth() + 'x' + player.videoHeight();
-                }
-                
-                // Buffer
-                const buffered = player.buffered();
-                if (buffered.length > 0) {
-                    const bufferEnd = buffered.end(buffered.length - 1);
-                    const currentTime = player.currentTime();
-                    const bufferSize = Math.round(bufferEnd - currentTime);
-                    document.getElementById('buffer').textContent = bufferSize;
-                }
-                
-                // Bitrate (simulated)
-                document.getElementById('bitrate').textContent = 
-                    Math.floor(Math.random() * 3000 + 1000) + ' kbps';
-                
-                // Dropped frames
-                const videoElement = player.el().querySelector('video');
-                if (videoElement.webkitDroppedFrameCount) {
-                    document.getElementById('dropped').textContent = 
-                        videoElement.webkitDroppedFrameCount;
-                }
-            }
-            
-            setTimeout(updateStats, 1000);
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initPlayer);
+        document.addEventListener('DOMContentLoaded', function() {
+            initPlayer();
+            testCORS();
+        });
     </script>
 </body>
 </html>
 EOF
 
-
-# 14. Set final permissions
-print_status "Step 14: Setting final permissions..."
+# 12. Set final permissions
+print_status "Step 12: Setting final permissions..."
 sudo chown -R $current_user:www-data $HLS_ROOT
 sudo chmod -R 755 $HLS_ROOT
 sudo find $HLS_ROOT -type f -exec chmod 644 {} \;
 
-# 15. Test and Start Services
-print_status "Step 15: Testing configuration..."
+# 13. Test and Start Services
+print_status "Step 13: Testing configuration..."
 sudo nginx -t
 
 if [ $? -eq 0 ]; then
     print_status "Configuration test passed!"
     
-    # Enable and start nginx
     sudo systemctl enable nginx
     sudo systemctl restart nginx
     
-    # Wait a moment for service to start
     sleep 3
     
-    # Test the server
     HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null)
     if [ "$HTTP_STATUS" = "200" ]; then
-        print_status "✅ HLS Server setup completed successfully!"
+        print_status "HLS Server setup completed successfully!"
         echo ""
-        echo -e "${GREEN}🌐 Your server is accessible at: http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip')/${NC}"
+        echo -e "${GREEN}Server accessible at: http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip')/${NC}"
         echo ""
-        echo -e "${BLUE}📋 Management Commands:${NC}"
-        echo "  sudo hls-manager status    # Check server status"
-        echo "  sudo hls-manager logs      # View access logs"
-        echo "  sudo hls-manager info      # Server information"
-        echo "  sudo hls-manager restart   # Restart server"
-        echo "  sudo hls-manager security  # Security status"
+        echo -e "${BLUE}Management Commands:${NC}"
+        echo "  sudo hls-manager status      # Check server status"
+        echo "  sudo hls-manager cors-test   # Test CORS configuration"
+        echo "  sudo hls-manager logs        # View access logs"
+        echo "  sudo hls-manager info        # Server information"
         echo ""
-        echo -e "${BLUE}📁 Upload your videos to:${NC} $VIDEOS_DIR"
-        echo -e "${BLUE}🎯 Access format:${NC} http://$SERVER_IP${NC}/videos/course/lesson.m3u8"
+        echo -e "${BLUE}CORS Configuration:${NC}"
+        echo "  Allowed origins: localhost, innovask.com"
+        echo "  Test page: http://your-server-ip/player.html"
         echo ""
-        echo -e "${GREEN}✨ Expected Performance:${NC}"
-        echo "  • Concurrent users: 10,000-15,000"
-        echo "  • Video quality: 720p HLS optimized"
-        echo "  • Bandwidth per user: 2-3 Mbps"
-        echo "  • Cache efficiency: 24h for segments, 5s for playlists"
+        echo -e "${BLUE}Upload videos to:${NC} $VIDEOS_DIR"
         
     else
         print_warning "Server started but HTTP test failed (Status: $HTTP_STATUS)"
-        echo "Check with: sudo hls-manager status"
     fi
     
 else
     print_error "Nginx configuration test failed!"
-    echo "Please check the error messages above and try again."
     exit 1
 fi
 
-# 16. Security Setup (Basic Firewall)
-print_status "Step 16: Setting up basic security..."
+# 14. Security Setup
+print_status "Step 14: Setting up basic security..."
 sudo ufw --force enable
-sudo ufw allow 22    # SSH
-sudo ufw allow 80    # HTTP
-sudo ufw allow 443   # HTTPS (for future SSL setup)
+sudo ufw allow 22
+sudo ufw allow 80
+sudo ufw allow 443
 
-print_status "Basic firewall configured (SSH, HTTP, HTTPS allowed)"
+print_status "Firewall configured"
 
-# 18. Final System Check and Security
-print_status "Step 18: Final system verification and security setup..."
-
-# Block the attacking IP from logs if still active
-ATTACKING_IP="78.153.140.224"
-if sudo grep -q "$ATTACKING_IP" /var/log/nginx/error.log 2>/dev/null; then
-    print_warning "Blocking attacking IP: $ATTACKING_IP"
-    sudo ufw deny from $ATTACKING_IP
-fi
-
-# Set final permissions
-sudo chown -R www-data:www-data $HLS_ROOT
-sudo chmod -R 755 $HLS_ROOT
-sudo find $HLS_ROOT -type f -exec chmod 644 {} \;
-
+# 15. Final status
 echo ""
-echo "=== Final System Status ==="
-echo "Nginx: $(systemctl is-active nginx)"
-echo "Firewall: $(sudo ufw status | head -1)"
-echo "Storage: $(df -h /var/www/hls | tail -1 | awk '{print "Used: "$3" / Available: "$4" ("$5" full)"}')"
-echo "Videos Directory: $(ls -la $VIDEOS_DIR | wc -l) items"
+echo "=== Setup Complete ==="
+echo "CORS configured for:"
+echo "  - http://localhost (testing)"
+echo "  - https://innovask.com (production)"
+echo "  - https://www.innovask.com (production)"
 echo ""
-
-# Final connectivity test
-print_status "Step 19: Testing server connectivity..."
-sleep 2
-
-# Test localhost
-LOCAL_TEST=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null)
-print_status "Local test: HTTP $LOCAL_TEST"
-
-# Test external (if possible)
-SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "unknown")
-if [ "$SERVER_IP" != "unknown" ]; then
-    echo -e "${GREEN}🌐 External IP: $SERVER_IP${NC}"
-    EXTERNAL_TEST=$(timeout 10 curl -s -o /dev/null -w "%{http_code}" http://$SERVER_IP/ 2>/dev/null || echo "timeout")
-    if [ "$EXTERNAL_TEST" = "200" ]; then
-        print_status "✅ External access working: HTTP $EXTERNAL_TEST"
-    else
-        print_warning "External access test: $EXTERNAL_TEST (may need firewall adjustment)"
-    fi
-fi
-
-# 20. Show final instructions
-print_status "🎉 HLS Server setup completed successfully!"
+echo "Test CORS: sudo hls-manager cors-test"
 echo ""
-echo -e "${BLUE}============================================${NC}"
-echo -e "${BLUE}         SETUP COMPLETE!                   ${NC}"
-echo -e "${BLUE}============================================${NC}"
-echo ""
-echo -e "${GREEN}✅ What's working now:${NC}"
-echo "  • HLS Server running on port 80"
-echo "  • Security protections active"
-echo "  • Performance optimizations applied"
-echo "  • Management tools installed"
-echo "  • Web interface available"
-echo ""
-echo -e "${BLUE}🌐 Access URLs:${NC}"
-echo "  Main page:     http://$SERVER_IP/"
-echo "  Video library: http://$SERVER_IP/videos/"
-echo "  Health check:  http://$SERVER_IP/health"
-echo "  Test video:    http://$SERVER_IP/videos/test-course/sample.m3u8"
-echo ""
-echo -e "${BLUE}📁 Next Steps:${NC}"
-echo "  1. Upload your M3U8 and TS files to: $VIDEOS_DIR"
-echo "  2. Example structure: /videos/course-name/lesson.m3u8"
-echo "  3. Set permissions: sudo chown -R www-data:www-data $VIDEOS_DIR"
-echo "  4. Test your videos: http://$SERVER_IP/videos/your-course/your-lesson.m3u8"
-echo ""
-echo -e "${BLUE}🔧 Management:${NC}"
-echo "  sudo hls-manager status     # Check everything"
-echo "  sudo hls-manager logs       # Watch traffic"
-echo "  sudo hls-manager info       # Server details"
-echo "  sudo hls-manager security   # Security status"
-echo ""
-echo -e "${GREEN}🎯 Performance Targets:${NC}"
-echo "  • 10,000-15,000 concurrent students"
-echo "  • 2-3 Mbps per 720p stream"
-echo "  • Automatic caching and optimization"
-echo "  • Built-in security against attacks"
-echo ""
-echo -e "${YELLOW}⚠️  Important:${NC}"
-echo "  • Always test videos after upload"
-echo "  • Monitor with 'sudo hls-manager status'"
-echo "  • Check logs if issues occur"
-echo "  • Keep system updated regularly"
-echo ""
-print_status "Your educational video platform is ready for students! 🚀📚"
-
-# Log the completion
-echo "$(date): HLS Server setup completed successfully" | sudo tee -a /var/log/nginx/hls-setup.log > /dev/null
 
 exit 0
