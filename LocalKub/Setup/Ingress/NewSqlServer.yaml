@@ -1,0 +1,298 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sqlserver
+  labels:
+    name: sqlserver
+    environment: production
+
+---
+# Secret for password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sqlserver-secret
+  namespace: sqlserver
+type: Opaque
+stringData:
+  sa-password: "039ab191-b080-4ace-956d-deddee908f55"
+
+---
+#PersistentVolumeClaim for permanent data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sqlserver-pvc
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+# storageClassName: standard # Change it according to the Storage Class in the cluster
+
+---
+# ConfigMap for initialization script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sqlserver-init-script
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+data:
+  init.sql: |
+    -- Wait for the database to be fully ready
+    WAITFOR DELAY '00:00:05';
+
+    -- Create the database
+    IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'Innovask_Serilog')
+    BEGIN
+      CREATE DATABASE Innovask_Serilog;
+      PRINT 'Database Innovask_Serilog created successfully';
+    END
+    ELSE
+    BEGIN
+      PRINT 'Database Innovask_Serilog already exists';
+    END
+    GO
+
+    -- Switch to the database
+    USE Innovask_Serilog;
+    GO
+
+    PRINT 'Database initialization completed successfully';
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqlserver
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+    component: database
+    version: "2022"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Important for databases with PVC
+  selector:
+    matchLabels:
+      app: sqlserver
+  template:
+    metadata:
+      labels:
+        app: sqlserver
+        component: database
+        version: "2022"
+    spec:
+      securityContext:
+        fsGroup: 10001 # SQL Server user group
+      containers:
+        - name: sqlserver
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+              name: sqlserver
+              protocol: TCP
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sqlserver-secret
+                  key: sa-password
+            - name: MSSQL_PID
+              value: "Express"
+            - name: MSSQL_COLLATION
+              value: "SQL_Latin1_General_CP1_CI_AS"
+          volumeMounts:
+            - name: sqlserver-data
+              mountPath: /var/opt/mssql
+            - name: init-script
+              mountPath: /tmp/init
+              readOnly: true
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+        # Sidecar Container لتنفيذ سكريبت التهيئة
+        - name: sqlserver-init-sidecar
+          image: mcr.microsoft.com/mssql-tools:18
+          env:
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sqlserver-secret
+                  key: sa-password
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "========================================="
+              echo "SQL Server Initialization Script"
+              echo "========================================="
+
+              echo "Waiting for SQL Server to be ready..."
+              RETRY_COUNT=0
+              MAX_RETRIES=60
+
+              until /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT @@VERSION" -l 5 -C > /dev/null 2>&1; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+                  echo "ERROR: SQL Server failed to start after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+                echo "Attempt $RETRY_COUNT/$MAX_RETRIES - SQL Server not ready yet, retrying in 2 seconds..."
+                sleep 2
+              done
+
+              echo "✓ SQL Server is ready!"
+              echo "Running initialization script..."
+
+              if /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -i /tmp/init/init.sql -C; then
+                echo "✓ Initialization script executed successfully!"
+              else
+                echo "⚠ Warning: Initialization script encountered an error, but continuing..."
+              fi
+
+              echo "========================================="
+              echo "Initialization completed. Container will sleep for 1 hour then exit."
+              echo "The SQL Server container will continue running."
+              echo "========================================="
+
+              # Sleep for an hour then go out (instead of tail -f)
+              sleep 3600
+          volumeMounts:
+            - name: init-script
+              mountPath: /tmp/init
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+      volumes:
+        - name: sqlserver-data
+          persistentVolumeClaim:
+            claimName: sqlserver-pvc
+        - name: init-script
+          configMap:
+            name: sqlserver-init-script
+
+---
+# Service internal (for applications inside the cluster)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver-internal
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+    service-type: internal
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1433
+      targetPort: 1433
+      protocol: TCP
+      name: sqlserver
+  selector:
+    app: sqlserver
+
+---
+# Service external (for access through SSMS)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver-external
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+    service-type: external
+  annotations:
+    # يمكنك إضافة Annotations حسب مزود الكلاود
+    # مثال لـ Azure:
+    # service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    # مثال لـ AWS:
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  # إذا كنت تريد تحديد IP معين (اختياري)
+  # loadBalancerIP: "YOUR_STATIC_IP"
+
+  # إذا كنت تريد تقييد الوصول لـ IP معين
+  # loadBalancerSourceRanges:
+  #   - "YOUR_IP/32"
+  #   - "YOUR_OFFICE_IP_RANGE/24"
+
+  ports:
+    - port: 1433
+      targetPort: 1433
+      protocol: TCP
+      name: sqlserver
+  selector:
+    app: sqlserver
+  sessionAffinity: ClientIP
+
+---
+# NetworkPolicy (Optional - for additional security)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sqlserver-network-policy
+  namespace: sqlserver
+spec:
+  podSelector:
+    matchLabels:
+      app: sqlserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections on port 1433
+    - from:
+        - namespaceSelector: {} # From any namespace
+      ports:
+        - protocol: TCP
+          port: 1433
+  egress:
+    # Allow all outgoing connections
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+        - protocol: UDP
