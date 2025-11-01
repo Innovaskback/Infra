@@ -1,3 +1,7 @@
+
+ssh -i oci-ssh.key ubuntu@132.145.254.121
+ssh -i C:\Users\Tawab\Downloads\oci-ssh.key ubuntu@132.145.254.121
+
 Clone From Git
 
 git clone https://github.com/ZednyBackEnd/dashboard.git C:\Users\Tawab\Desktop\App\Back\dashboard

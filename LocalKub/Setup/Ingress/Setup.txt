@@ -1,0 +1,99 @@
+
+69.10.55.229
+
+tawab
+KubeD=0108418585*#@$
+
+
+sudo apt update
+sudo snap install kubectl --classic
+sudo reboot
+
+
+
+# Install nginx ingress controller 
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/baremetal/deploy.yaml
+
+# Install MetalLB
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+
+kubectl create namespace kafka
+
+# The number of processor cores must be greater than 2
+
+kubectl apply -f LocalKub/Setup/kafka/MkDirJob.yaml
+
+kubectl apply -f LocalKub/Setup/kafka/StorageSetup.yaml
+
+kubectl apply -f LocalKub/Setup/kafka/kafkazookeeper.yaml
+
+kubectl get pods -n kafka -w
+
+kubectl apply -f LocalKub/Setup/kafka/kafka.yaml
+
+kubectl get pods -A --all-namespaces --sort-by=.metadata.creationTimestamp
+
+kubectl get pods -o wide -n kafka
+
+
+kubectl create namespace production
+
+#Login DOCKER
+kubectl create secret docker-registry docker-hub-secret  --docker-server=https://index.docker.io/v1/  --docker-username=tawabsoft  --docker-password=dckr_pat_dkXl0UUXezskxxhYF6SeK2Q2p1U   --docker-email=tawabsoft@gmail.com  -n production
+
+
+# 1. create namespace
+kubectl create namespace sqlserver
+
+# 2. Create a storage folder
+kubectl apply -f LocalKub/Setup/Ingress/sqlserver-pv.yaml
+
+# 3. Deploying SQL Server
+kubectl apply -f LocalKub/Setup/Ingress/sqlserver.yaml
+
+#4. Verification
+kubectl get pods -n sqlserver
+kubectl logs -n sqlserver deployment/sqlserver -c sqlserver-init
+
+# From outside the cluster (SSMS):
+
+```
+Server:   69.10.55.229,31434
+Username: sa
+Password: 039ab191-b080-4ace-956d-deddee908f55
+Database: Innovask_Serilog
+```
+
+# From inside the cluster (for applications):
+"DefaultConnection": "Data Source=sqlserver-internal.sqlserver.svc.cluster.local;Initial Catalog=AuthApi;User ID=sa;Password=039ab191-b080-4ace-956d-deddee908f55;Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10"
+ "connectionString": "Data Source=sqlserver-internal.sqlserver.svc.cluster.local;Initial Catalog=Innovask_Serilog;Integrated Security=False;User ID=sa;Password=039ab191-b080-4ace-956d-deddee908f55;Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10;ApplicationIntent=ReadWrite;MultiSubnetFailover=False",
+
+
+"DefaultConnection": "Data Source=69.10.55.230;Initial Catalog=AuthApi;Integrated Security=False;User ID=sa;Password=039ab191-b080-4ace-956d-deddee908f55;Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10;ApplicationIntent=ReadWrite;MultiSubnetFailover=False"
+"connectionString": "Data Source=69.10.55.230;Initial Catalog=Innovask_Serilog;Integrated Security=False;User ID=sa;Password=039ab191-b080-4ace-956d-deddee908f55;Connect Timeout=120;Encrypt=False;TrustServerCertificate=True;Max Pool Size=200;Min Pool Size=10;ApplicationIntent=ReadWrite;MultiSubnetFailover=False",
+
+
+# 4-apply AuthAPI by github workflows Regarding .github/workflows/production.yml implementation
+kubectl apply -f LocalKub/Setup/Ingress/AuthAPI.yaml
+
+# 5-apply Ingress
+kubectl apply -f LocalKub/Setup/Ingress/Ingress_ip.yaml
+
+
+
+
+#6 SSL 
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=120s
+
+kubectl apply -f LocalKub/Setup/Ingress/Cluster-issuer.yaml
+
+kubectl apply -f LocalKub/Setup/Ingress/Ingress-ssl.yaml
+
+kubectl get certificate -n production
+
+kubectl describe certificate -n production innovask-certificate
+
+kubectl get challenges -A

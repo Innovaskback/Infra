@@ -14,8 +14,12 @@ sudo ./setup.sh
 
 
 --Free SSL
+sudo apt-get update
 
+sudo apt-get install certbot
 
-sudo certbot --nginx -d st.innovask.com -d www.st.innovask.com
+sudo apt-get install python3-certbot-nginx
+
+sudo certbot --nginx -d load.innovask.com -d www.load.innovask.com
 
 

@@ -77,12 +77,12 @@ spec:
           log.segment.bytes=1073741824
           log.retention.check.interval.ms=300000
           
-          # Replication - البدء بقيم منخفضة
-          offsets.topic.replication.factor=1
-          transaction.state.log.replication.factor=1
-          transaction.state.log.min.isr=1
-          default.replication.factor=1
-          min.insync.replicas=1
+          # Replication - قيم Production للحماية القصوى
+          offsets.topic.replication.factor=3
+          transaction.state.log.replication.factor=3
+          transaction.state.log.min.isr=2
+          default.replication.factor=3
+          min.insync.replicas=2
           
           # Performance
           num.network.threads=8
@@ -105,7 +105,7 @@ spec:
           request.timeout.ms=30000
           
           # Leader Election
-          unclean.leader.election.enable=true
+          # unclean.leader.election.enable=true
           leader.imbalance.check.interval.seconds=300
           leader.imbalance.per.broker.percentage=10
           

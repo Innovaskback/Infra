@@ -6,7 +6,7 @@ metadata:
 spec:
   serviceName: zookeeper-headless
   replicas: 3
-  podManagementPolicy: Parallel  # إضافة هذا لتشغيل البودز بالتوازي
+  podManagementPolicy: OrderedReady  # تشغيل متسلسل لضمان استقرار Quorum
   selector:
     matchLabels:
       app: zookeeper
@@ -119,6 +119,7 @@ spec:
       name: zookeeper-data
     spec:
       accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
       resources:
         requests:
           storage: 5Gi
@@ -126,6 +127,7 @@ spec:
       name: zookeeper-logs
     spec:
       accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
       resources:
         requests:
           storage: 5Gi

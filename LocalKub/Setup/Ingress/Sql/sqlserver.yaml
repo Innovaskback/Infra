@@ -1,0 +1,111 @@
+---
+# Secret لتخزين كلمة مرور SQL Server
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sqlserver-secret
+  namespace: sqlserver
+type: Opaque
+stringData:
+  MSSQL_SA_PASSWORD: "039ab191-b080-4ace-956d-deddee908f55"  # قم بتغيير كلمة المرور
+---
+# PersistentVolumeClaim لحفظ البيانات بشكل دائم
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sqlserver-pvc
+  namespace: sqlserver
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage  # استخدام local-storage
+  resources:
+    requests:
+      storage: 20Gi  # حجم التخزين المطلوب
+---
+# Deployment لخادم SQL Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqlserver
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sqlserver
+  template:
+    metadata:
+      labels:
+        app: sqlserver
+    spec:
+      containers:
+      - name: sqlserver
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+        - containerPort: 1433
+          name: sqlserver
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sqlserver-secret
+              key: MSSQL_SA_PASSWORD
+        - name: MSSQL_PID
+          value: "Developer"  # Developer, Express, Standard, Enterprise, EnterpriseCore
+        volumeMounts:
+        - name: sqlserver-storage
+          mountPath: /var/opt/mssql
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"  # تقليل CPU
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"  # تقليل CPU
+      volumes:
+      - name: sqlserver-storage
+        persistentVolumeClaim:
+          claimName: sqlserver-pvc
+---
+# Service داخلي للتطبيقات (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver-internal
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+spec:
+  type: ClusterIP  # خدمة داخلية فقط
+  ports:
+  - port: 1433
+    targetPort: 1433
+    protocol: TCP
+    name: sqlserver
+  selector:
+    app: sqlserver
+---
+# Service خارجي للوصول من SSMS (NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver-external
+  namespace: sqlserver
+  labels:
+    app: sqlserver
+spec:
+  type: NodePort  # للوصول من خارج Kubernetes
+  ports:
+  - port: 1433
+    targetPort: 1433
+    protocol: TCP
+    name: sqlserver
+    nodePort: 31433  # Port للوصول من خارج Kubernetes (30000-32767)
+  selector:
+    app: sqlserver
+

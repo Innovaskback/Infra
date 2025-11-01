@@ -1,0 +1,104 @@
+# ==============================================================================
+# Ingress Configuration with SSL/TLS for Auth API - Production
+# ==============================================================================
+# Complete configuration for Auth API with HTTPS support
+# Access via: https://kub.innovask.com/ba-auth/
+# ==============================================================================
+
+---
+# Certificate resource for automatic SSL/TLS provisioning
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: innovask-certificate
+  namespace: production
+  labels:
+    app: innovask
+    component: certificate
+spec:
+  # Kubernetes Secret where the certificate will be stored
+  secretName: innovask-tls
+
+  # Reference to the ClusterIssuer (Let's Encrypt)
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+
+  # Domain names covered by this certificate
+  dnsNames:
+    - kub.innovask.com
+
+  # Certificate validity period (90 days)
+  duration: 2160h # 90 days
+
+  # Renew certificate 30 days before expiry
+  renewBefore: 720h # 30 days
+
+---
+# Ingress resource with SSL/TLS configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-auth-api
+  namespace: production
+  labels:
+    app: auth-api-ingress
+    environment: production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    
+    # Certificate management
+    cert-manager.io/cluster-issuer: letsencrypt-production
+
+    # Force HTTPS redirects
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://innovask.com, https://www.innovask.com, https://kub.innovask.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+
+    # Timeout settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+    # Request body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+
+    # Health check configuration
+    nginx.ingress.kubernetes.io/health-check-path: "/ba-auth/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "10s"
+
+spec:
+  ingressClassName: nginx
+  
+  # TLS configuration
+  tls:
+    - hosts:
+        - kub.innovask.com
+      # Reference to the Secret containing the TLS certificate
+      secretName: innovask-tls
+  
+  rules:
+    - host: kub.innovask.com
+      http:
+        paths:
+          # Auth API - Main endpoint
+          - path: /ba-auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-auth-api
+                port:
+                  number: 8080
+

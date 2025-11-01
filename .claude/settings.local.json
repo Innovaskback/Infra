@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(ping:*)",
+      "Bash(powershell.exe:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

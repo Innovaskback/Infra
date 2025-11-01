@@ -1,24 +1,42 @@
-# StorageClass للتخزين المحلي
+# ========================================
+# Kafka & Zookeeper Storage Configuration
+# ========================================
+# This file sets up persistent storage for Kafka and Zookeeper
+# - Creates StorageClass for local storage
+# - Creates Job to prepare directories on host
+# - Creates PersistentVolumes for all Kafka and Zookeeper nodes
+# ========================================
+
+---
+# StorageClass for local storage (marked as default)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: local-storage
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    app: kafka-zookeeper
+    type: local-storage
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
 
 ---
-# Job لإنشاء جميع المجلدات المطلوبة
+# Job to create all required directories on host machine
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: create-all-directories-v2
+  name: create-kafka-zookeeper-storage
   namespace: kafka
+  labels:
+    app: kafka-zookeeper
+    component: storage-setup
 spec:
+  backoffLimit: 3
   template:
     spec:
+      restartPolicy: OnFailure
       hostPID: true
       containers:
       - name: directory-creator
@@ -27,24 +45,46 @@ spec:
         - /bin/sh
         - -c
         - |
-          # إنشاء المجلدات للزووكيبر (3 عقد) في مسار دائم
+          echo "========================================="
+          echo "Kafka & Zookeeper Storage Setup"
+          echo "========================================="
+          echo "Creating permanent directories..."
+          echo ""
+
+          # إنشاء المجلدات للزووكيبر (3 عقد)
+          echo "Creating Zookeeper directories..."
           for i in 0 1 2; do
             mkdir -p /host-data/kafka-storage/zookeeper-data-$i
             mkdir -p /host-data/kafka-storage/zookeeper-logs-$i
             chmod 777 /host-data/kafka-storage/zookeeper-data-$i
             chmod 777 /host-data/kafka-storage/zookeeper-logs-$i
-            echo "Created zookeeper directories for node $i"
+            echo "  ✓ Created zookeeper-data-$i and zookeeper-logs-$i"
           done
-          
+
+          echo ""
+          echo "Creating Kafka directories..."
           # إنشاء المجلدات لكافكا (3 عقد)
           for i in 0 1 2; do
             mkdir -p /host-data/kafka-storage/kafka-data-$i
             chmod 777 /host-data/kafka-storage/kafka-data-$i
-            echo "Created kafka directory for node $i"
+            echo "  ✓ Created kafka-data-$i"
           done
-          
-          echo "All directories created successfully!"
+
+          echo ""
+          echo "========================================="
+          echo "All permanent directories created successfully!"
+          echo "========================================="
+          echo ""
+          echo "Directory listing:"
           ls -la /host-data/kafka-storage/ | grep -E "(zookeeper|kafka)"
+
+          echo ""
+          echo "Storage paths (persistent after pod restarts):"
+          echo "  Zookeeper data: /var/lib/kafka-storage/zookeeper-data-{0,1,2}"
+          echo "  Zookeeper logs: /var/lib/kafka-storage/zookeeper-logs-{0,1,2}"
+          echo "  Kafka data:     /var/lib/kafka-storage/kafka-data-{0,1,2}"
+          echo ""
+          echo "Storage setup completed successfully!"
         securityContext:
           privileged: true
         volumeMounts:
@@ -54,7 +94,7 @@ spec:
       - name: host-data
         hostPath:
           path: /var/lib
-      restartPolicy: OnFailure
+          type: DirectoryOrCreate
       tolerations:
       - effect: NoSchedule
         operator: Exists
@@ -62,11 +102,19 @@ spec:
         operator: Exists
 
 ---
-# PersistentVolumes للزووكيبر - جميع العقد - مسارات محدثة
+# ========================================
+# PersistentVolumes for Zookeeper
+# ========================================
+
+# Zookeeper Node 0 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-data-pv-0-new
+  name: zookeeper-data-pv-0
+  labels:
+    app: zookeeper
+    component: data
+    node: "0"
 spec:
   capacity:
     storage: 5Gi
@@ -84,10 +132,15 @@ spec:
           operator: Exists
 
 ---
+# Zookeeper Node 0 - Logs
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-logs-pv-0-new
+  name: zookeeper-logs-pv-0
+  labels:
+    app: zookeeper
+    component: logs
+    node: "0"
 spec:
   capacity:
     storage: 5Gi
@@ -105,10 +158,15 @@ spec:
           operator: Exists
 
 ---
+# Zookeeper Node 1 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-data-pv-1-new
+  name: zookeeper-data-pv-1
+  labels:
+    app: zookeeper
+    component: data
+    node: "1"
 spec:
   capacity:
     storage: 5Gi
@@ -126,10 +184,15 @@ spec:
           operator: Exists
 
 ---
+# Zookeeper Node 1 - Logs
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-logs-pv-1-new
+  name: zookeeper-logs-pv-1
+  labels:
+    app: zookeeper
+    component: logs
+    node: "1"
 spec:
   capacity:
     storage: 5Gi
@@ -147,10 +210,15 @@ spec:
           operator: Exists
 
 ---
+# Zookeeper Node 2 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-data-pv-2-new
+  name: zookeeper-data-pv-2
+  labels:
+    app: zookeeper
+    component: data
+    node: "2"
 spec:
   capacity:
     storage: 5Gi
@@ -168,10 +236,15 @@ spec:
           operator: Exists
 
 ---
+# Zookeeper Node 2 - Logs
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zookeeper-logs-pv-2-new
+  name: zookeeper-logs-pv-2
+  labels:
+    app: zookeeper
+    component: logs
+    node: "2"
 spec:
   capacity:
     storage: 5Gi
@@ -189,11 +262,19 @@ spec:
           operator: Exists
 
 ---
-# PersistentVolumes لكافكا - جميع العقد - مسارات محدثة
+# ========================================
+# PersistentVolumes for Kafka
+# ========================================
+
+# Kafka Node 0 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: kafka-data-pv-0-new
+  name: kafka-data-pv-0
+  labels:
+    app: kafka
+    component: data
+    node: "0"
 spec:
   capacity:
     storage: 10Gi
@@ -211,10 +292,15 @@ spec:
           operator: Exists
 
 ---
+# Kafka Node 1 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: kafka-data-pv-1-new
+  name: kafka-data-pv-1
+  labels:
+    app: kafka
+    component: data
+    node: "1"
 spec:
   capacity:
     storage: 10Gi
@@ -232,10 +318,15 @@ spec:
           operator: Exists
 
 ---
+# Kafka Node 2 - Data
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: kafka-data-pv-2-new
+  name: kafka-data-pv-2
+  labels:
+    app: kafka
+    component: data
+    node: "2"
 spec:
   capacity:
     storage: 10Gi
@@ -251,3 +342,19 @@ spec:
       - matchExpressions:
         - key: kubernetes.io/hostname
           operator: Exists
+
+---
+# ========================================
+# Summary:
+# ========================================
+# - 1 StorageClass (local-storage)
+# - 1 Job (create-kafka-zookeeper-storage)
+# - 6 PersistentVolumes for Zookeeper (3 data + 3 logs)
+# - 3 PersistentVolumes for Kafka (3 data)
+# Total: 9 PersistentVolumes
+#
+# To apply:
+# 1. kubectl apply -f StorageSetup.yaml
+# 2. Wait for job completion: kubectl wait --for=condition=complete job/create-kafka-zookeeper-storage -n kafka
+# 3. Verify PVs: kubectl get pv
+# ========================================

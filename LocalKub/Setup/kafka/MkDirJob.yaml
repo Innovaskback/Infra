@@ -1,12 +1,13 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: create-directories-simple
+  name: create-kafka-directories
   namespace: kafka
 spec:
   template:
     spec:
       restartPolicy: OnFailure
+      hostPID: true
       containers:
       - name: mkdir
         image: busybox:1.35
@@ -14,19 +15,47 @@ spec:
         - /bin/sh
         - -c
         - |
-          echo "Creating directories in /tmp..."
-          mkdir -p /tmp/zookeeper-data-0 /tmp/zookeeper-data-1 /tmp/zookeeper-data-2
-          mkdir -p /tmp/zookeeper-logs-0 /tmp/zookeeper-logs-1 /tmp/zookeeper-logs-2
-          mkdir -p /tmp/kafka-data-0 /tmp/kafka-data-1 /tmp/kafka-data-2
-          chmod 777 /tmp/zookeeper-* /tmp/kafka-*
-          echo "Directories created successfully:"
-          ls -la /tmp/ | grep -E "(zookeeper|kafka)" || echo "No directories found"
-          echo "Job completed successfully"
+          echo "Creating permanent directories for Kafka and Zookeeper..."
+          echo "Base path: /host-data/kafka-storage"
+
+          # إنشاء المجلدات للزووكيبر (3 عقد)
+          for i in 0 1 2; do
+            mkdir -p /host-data/kafka-storage/zookeeper-data-$i
+            mkdir -p /host-data/kafka-storage/zookeeper-logs-$i
+            chmod 777 /host-data/kafka-storage/zookeeper-data-$i
+            chmod 777 /host-data/kafka-storage/zookeeper-logs-$i
+            echo "✓ Created zookeeper directories for node $i"
+          done
+
+          # إنشاء المجلدات لكافكا (3 عقد)
+          for i in 0 1 2; do
+            mkdir -p /host-data/kafka-storage/kafka-data-$i
+            chmod 777 /host-data/kafka-storage/kafka-data-$i
+            echo "✓ Created kafka directory for node $i"
+          done
+
+          echo ""
+          echo "All permanent directories created successfully!"
+          echo "Directory listing:"
+          ls -la /host-data/kafka-storage/ | grep -E "(zookeeper|kafka)"
+
+          echo ""
+          echo "Storage paths (will persist after pod restarts):"
+          echo "  - Zookeeper data: /var/lib/kafka-storage/zookeeper-data-{0,1,2}"
+          echo "  - Zookeeper logs: /var/lib/kafka-storage/zookeeper-logs-{0,1,2}"
+          echo "  - Kafka data: /var/lib/kafka-storage/kafka-data-{0,1,2}"
+        securityContext:
+          privileged: true
         volumeMounts:
-        - name: host-tmp
-          mountPath: /tmp
+        - name: host-data
+          mountPath: /host-data
       volumes:
-      - name: host-tmp
+      - name: host-data
         hostPath:
-          path: /tmp
+          path: /var/lib
           type: DirectoryOrCreate
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists

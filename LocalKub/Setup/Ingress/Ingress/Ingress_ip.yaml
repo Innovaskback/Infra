@@ -1,0 +1,227 @@
+# ==============================================================================
+# Ingress Configuration for Auth API - Production
+# ==============================================================================
+# Complete configuration for Auth API with IP-based access
+# Access via: http://69.10.55.229/ba-auth/
+# ==============================================================================
+# This file includes:
+# - Ingress Controller Service (LoadBalancer type)
+# - NGINX ConfigMaps
+# - Auth API Ingress
+# - MetalLB IP Address Pool
+# - IngressClass
+# ==============================================================================
+
+# ==============================================================================
+# 1. INGRESS CONTROLLER SERVICE (LoadBalancer)
+# ==============================================================================
+# ⚠️ CRITICAL: Must be type: LoadBalancer for direct IP access
+# If NodePort, you won't be able to access via http://69.10.55.229/...
+# Instead, you'll need http://69.10.55.229:31062/...
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+
+---
+# ==============================================================================
+# 2. NGINX INGRESS CONTROLLER CONFIGURATION
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ingress-controller-config
+  namespace: ingress-nginx
+data:
+  # Request body size
+  proxy-body-size: "10m"
+
+  # Connection timeouts
+  proxy-connect-timeout: "60"
+  proxy-send-timeout: "60"
+  proxy-read-timeout: "60"
+
+  # Enable real IP forwarding
+  use-forwarded-headers: "true"
+  compute-full-forwarded-for: "true"
+
+  # SSL configuration (disabled for IP-based access)
+  ssl-redirect: "false"
+  force-ssl-redirect: "false"
+
+  # CORS configuration
+  enable-cors: "true"
+  cors-allow-origin: "*"
+  cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+  cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+  cors-expose-headers: "Content-Length,Content-Range"
+  cors-allow-credentials: "true"
+  cors-max-age: "86400"
+
+---
+# ==============================================================================
+# 3. CUSTOM HEADERS CONFIGMAP
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-headers
+  namespace: ingress-nginx
+data:
+  # Security headers
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+
+  # Custom headers
+  X-Powered-By: "Innovask Platform"
+
+---
+# ==============================================================================
+# 4. AUTH API INGRESS
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-auth-api
+  namespace: production
+  labels:
+    app: auth-api-ingress
+    environment: production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+
+    # Disable SSL redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+
+    # Timeout settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+    # Request body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+
+    # Health check configuration
+    nginx.ingress.kubernetes.io/health-check-path: "/ba-auth/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "10s"
+
+    # Do not rewrite - pass full path to application (app.UsePathBase expects /ba-auth)
+    # The application handles the /ba-auth prefix internally
+
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Auth API - Main endpoint (Prefix covers all sub-paths including /ba-auth/health, /ba-auth/swagger, etc.)
+          # Pass full path to app - app.UsePathBase("/ba-auth") handles the prefix internally
+          - path: /ba-auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ba-auth-api
+                port:
+                  number: 8080
+
+---
+# ==============================================================================
+# 5. METALLB IP ADDRESS POOL
+# ==============================================================================
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: production-ip-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 69.10.55.229/32
+  autoAssign: true
+
+---
+# ==============================================================================
+# 6. METALLB L2 ADVERTISEMENT
+# ==============================================================================
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: production-l2-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - production-ip-pool
+
+---
+# ==============================================================================
+# 7. INGRESS CLASS DEFINITION
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+# ==============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ==============================================================================
+# 1. Ensure MetalLB is installed and running:
+#    kubectl get pods -n metallb-system
+#
+# 2. Ensure IP Address Pool contains the IP being used (69.10.55.229):
+#    kubectl get ipaddresspool -n metallb-system
+#
+# 3. Apply this file:
+#    kubectl apply -f .github/kubectl/Ingress_ip.yaml
+#
+# 4. Verify the result:
+#    kubectl get svc -n ingress-nginx ingress-nginx-controller
+#    # Should show:
+#    # TYPE: LoadBalancer
+#    # EXTERNAL-IP: 69.10.55.229
+#
+#    kubectl get ingress -n production ingress-auth-api
+#    # Should show:
+#    # ADDRESS: 69.10.55.229
+#
+# 5. Test access:
+#    curl http://69.10.55.229/ba-auth/health
+#    http://69.10.55.229/ba-auth/swagger/index.html
+# ==============================================================================

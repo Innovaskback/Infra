@@ -1,0 +1,40 @@
+# ========================================
+# Let's Encrypt Certificate Issuer
+# ========================================
+# This ClusterIssuer configures cert-manager to automatically
+# obtain and renew SSL/TLS certificates from Let's Encrypt
+# using HTTP-01 challenge validation through nginx ingress
+# ========================================
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+  labels:
+    app: cert-manager
+    component: issuer
+    environment: production
+spec:
+  acme:
+    # Let's Encrypt production server URL
+    # WARNING: Use staging server for testing to avoid rate limits
+    # Staging: https://acme-staging-v02.api.letsencrypt.org/directory
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Email address for ACME registration and urgent renewal notifications
+    email: tawabsoft@gmail.com
+
+    # Kubernetes Secret to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-production-key
+
+    # Challenge solvers - HTTP01 validation through nginx ingress
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+            # Optional: Specify ingressTemplate for advanced configuration
+            # ingressTemplate:
+            #   metadata:
+            #     labels:
+            #       app: cert-manager-challenge
